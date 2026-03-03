@@ -1,0 +1,105 @@
+#!/bin/bash
+# VPS provisioning script — run once as root on a fresh server
+# Usage: curl -sSL <raw-github-url> | bash
+#    or: bash setup.sh
+
+set -euo pipefail
+
+echo "=== System update ==="
+apt update && apt upgrade -y
+apt install -y curl git htop ufw fail2ban apache2-utils
+
+echo "=== Create deploy user ==="
+if ! id "deploy" &>/dev/null; then
+  adduser --disabled-password --gecos "" deploy
+  mkdir -p /home/deploy/.ssh
+  cp /root/.ssh/authorized_keys /home/deploy/.ssh/authorized_keys
+  chown -R deploy:deploy /home/deploy/.ssh
+  chmod 700 /home/deploy/.ssh
+  chmod 600 /home/deploy/.ssh/authorized_keys
+  echo "deploy ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/deploy
+  echo "Created deploy user with SSH key from root"
+else
+  echo "deploy user already exists"
+fi
+
+echo "=== Configure firewall ==="
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow ssh
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw --force enable
+
+echo "=== Install Docker ==="
+if ! command -v docker &>/dev/null; then
+  curl -fsSL https://get.docker.com | sh
+  usermod -aG docker deploy
+  echo "Docker installed"
+else
+  echo "Docker already installed"
+fi
+
+echo "=== Configure Docker daemon ==="
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json <<'DAEMON'
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "storage-driver": "overlay2"
+}
+DAEMON
+systemctl restart docker
+
+echo "=== Create directory structure ==="
+mkdir -p /opt/{infrastructure,apps,volumes/{mysql,redis},backups/{mysql,volumes}}
+mkdir -p /opt/volumes/apps
+chown -R deploy:deploy /opt
+
+echo "=== Create Docker networks ==="
+docker network create traefik-public 2>/dev/null || echo "traefik-public network already exists"
+docker network create backend 2>/dev/null || echo "backend network already exists"
+
+echo "=== Setup swap (2GB) ==="
+if [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  sysctl vm.swappiness=10
+  echo 'vm.swappiness=10' >> /etc/sysctl.conf
+  echo "Swap configured"
+else
+  echo "Swap already exists"
+fi
+
+echo "=== Harden SSH ==="
+sed -i 's/#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
+sed -i 's/#\?PermitRootLogin .*/PermitRootLogin no/' /etc/ssh/sshd_config
+systemctl reload sshd
+
+echo "=== Setup crontab for deploy user ==="
+CRON_CONTENT=$(cat <<'CRON'
+# Daily MySQL backup at 3 AM
+0 3 * * * /opt/infrastructure/backups/backup.sh >> /opt/backups/mysql/backup.log 2>&1
+
+# Weekly volume backup on Sunday at 4 AM
+0 4 * * 0 /opt/infrastructure/backups/volume-backup.sh >> /opt/backups/volumes/backup.log 2>&1
+
+# Weekly Docker cleanup on Sunday at 5 AM
+0 5 * * 0 docker image prune -af --filter "until=168h" >> /var/log/docker-prune.log 2>&1
+CRON
+)
+echo "$CRON_CONTENT" | crontab -u deploy -
+
+echo ""
+echo "=== Setup complete ==="
+echo "Next steps:"
+echo "  1. Log out and log back in as: ssh deploy@<server-ip>"
+echo "  2. Clone infrastructure repo to /opt/infrastructure/"
+echo "  3. Add .env and Cloudflare Origin Certs"
+echo "  4. Run: cd /opt/infrastructure && docker compose up -d"

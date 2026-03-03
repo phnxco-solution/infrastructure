@@ -1,0 +1,5 @@
+.env
+traefik/certs/*
+!traefik/certs/.gitkeep
+/backups/*.sql.gz
+/backups/*.tar.gz
