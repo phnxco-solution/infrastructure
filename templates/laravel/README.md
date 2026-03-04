@@ -59,7 +59,7 @@ The template includes all services by default (vite, worker, scheduler). Remove 
 
 ## Production Notes
 
-**Worker** uses `--memory=96` as a soft limit so it exits gracefully before hitting Docker's 128M hard ceiling. The `--timeout=90` per-job limit pairs with `stop_grace_period: 120s` to allow the current job to finish on shutdown.
+**Worker** uses `--memory=128` as a soft limit so it exits gracefully before hitting Docker's 192M hard ceiling. The `--timeout=90` per-job limit pairs with `stop_grace_period: 120s` to allow the current job to finish on shutdown.
 
 **Scheduler** uses `schedule:work` (foreground daemon, no cron needed). For tasks that must not run twice if you ever scale to multiple containers, add `->onOneServer()` in your schedule definitions — works out of the box with Redis as cache driver.
 

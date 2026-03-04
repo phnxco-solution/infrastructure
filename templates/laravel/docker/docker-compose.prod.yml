@@ -47,7 +47,7 @@ services:
     image: ghcr.io/phnxco-solution/{{APP_NAME}}:latest
     restart: unless-stopped
     env_file: ../.env
-    command: php artisan queue:work redis --max-jobs=1000 --max-time=3600 --tries=3 --timeout=90 --memory=96
+    command: php artisan queue:work redis --max-jobs=1000 --max-time=3600 --tries=3 --backoff=15 --timeout=90 --memory=128
     volumes:
       - /opt/volumes/apps/{{APP_NAME}}/storage:/var/www/html/storage
     networks:
@@ -66,7 +66,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 192M
 
   scheduler:
     image: ghcr.io/phnxco-solution/{{APP_NAME}}:latest
