@@ -11,11 +11,11 @@ apt install -y curl git htop ufw fail2ban apache2-utils
 echo "=== Create deploy user ==="
 if ! id "deploy" &>/dev/null; then
   adduser --disabled-password --gecos "" deploy
-  mkdir -p /home/deploy/.ssh
-  cp /root/.ssh/authorized_keys /home/deploy/.ssh/authorized_keys
+  cp -r /root/.ssh /home/deploy/.ssh
   chown -R deploy:deploy /home/deploy/.ssh
   chmod 700 /home/deploy/.ssh
-  chmod 600 /home/deploy/.ssh/authorized_keys
+  chmod 600 /home/deploy/.ssh/*
+  chmod 644 /home/deploy/.ssh/*.pub 2>/dev/null || true
   echo "deploy ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/deploy
   echo "Created deploy user with SSH key from root"
 else
