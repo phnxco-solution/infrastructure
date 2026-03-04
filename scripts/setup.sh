@@ -54,7 +54,7 @@ DAEMON
 systemctl restart docker
 
 echo "=== Create directory structure ==="
-mkdir -p /opt/{infrastructure,apps,volumes/{mysql,redis},backups/{mysql,volumes}}
+mkdir -p /opt/{infrastructure,apps,volumes/{mysql,redis,uptime-kuma},backups/{mysql,volumes}}
 mkdir -p /opt/volumes/apps
 chown -R deploy:deploy /opt
 

@@ -77,6 +77,49 @@ services:
       timeout: 5s
       retries: 3
 
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    volumes:
+      - /opt/volumes/uptime-kuma:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - traefik-public
+      - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.uptime-kuma.rule=Host(`${UPTIME_KUMA_DOMAIN}`)"
+      - "traefik.http.routers.uptime-kuma.entrypoints=websecure"
+      - "traefik.http.routers.uptime-kuma.tls=true"
+      - "traefik.http.services.uptime-kuma.loadbalancer.server.port=3001"
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+    healthcheck:
+      test: ["CMD-SHELL", "extra/healthcheck"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: autoheal
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: all
+      AUTOHEAL_INTERVAL: 60
+      AUTOHEAL_START_PERIOD: 120
+      AUTOHEAL_DEFAULT_STOP_TIMEOUT: 10
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
 networks:
   traefik-public:
     external: true
