@@ -56,3 +56,15 @@ The template includes all services by default (vite, worker, scheduler). Remove 
 - Runs `php artisan optimize` (caches config, routes, views)
 
 **No `docker compose run` needed during deploy** — the entrypoint handles migrations on container start.
+
+## Production Notes
+
+**Worker** uses `--memory=96` as a soft limit so it exits gracefully before hitting Docker's 128M hard ceiling. The `--timeout=90` per-job limit pairs with `stop_grace_period: 120s` to allow the current job to finish on shutdown.
+
+**Scheduler** uses `schedule:work` (foreground daemon, no cron needed). For tasks that must not run twice if you ever scale to multiple containers, add `->onOneServer()` in your schedule definitions — works out of the box with Redis as cache driver.
+
+**Both worker and scheduler** wait for the app container to be healthy before starting (`depends_on`), ensuring migrations have run. Both have healthchecks so Autoheal can restart stuck processes.
+
+**Redis queue config** — set these in your app's `config/queue.php` Redis connection:
+- `retry_after: 120` — must be greater than the worker's `--timeout=90`, otherwise jobs can execute twice
+- `block_for: 5` — Redis blocks efficiently instead of polling in a tight loop, and SIGTERM is still handled every 5s

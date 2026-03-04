@@ -47,13 +47,22 @@ services:
     image: ghcr.io/phnxco-solution/{{APP_NAME}}:latest
     restart: unless-stopped
     env_file: ../.env
-    command: php artisan queue:work redis --max-jobs=1000 --max-time=3600 --tries=3 --timeout=90
+    command: php artisan queue:work redis --max-jobs=1000 --max-time=3600 --tries=3 --timeout=90 --memory=96
     volumes:
       - /opt/volumes/apps/{{APP_NAME}}/storage:/var/www/html/storage
     networks:
       - backend
+    depends_on:
+      app:
+        condition: service_healthy
     stop_signal: SIGTERM
     stop_grace_period: 120s
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'artisan queue:work' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -64,12 +73,25 @@ services:
     restart: unless-stopped
     env_file: ../.env
     command: php artisan schedule:work
+    volumes:
+      - /opt/volumes/apps/{{APP_NAME}}/storage:/var/www/html/storage
     networks:
       - backend
+    depends_on:
+      app:
+        condition: service_healthy
+    stop_signal: SIGTERM
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'artisan schedule:work' > /dev/null || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     deploy:
       resources:
         limits:
-          memory: 64M
+          memory: 128M
 
 networks:
   traefik-public:
