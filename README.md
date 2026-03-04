@@ -57,19 +57,26 @@ infrastructure/
 - A Cloudflare account managing your domain(s)
 - This repo pushed to GitHub
 
-### Step 1: Provision the VPS
+### Step 1: Clone the repo and provision the VPS
 
-SSH in as root and run the setup script:
+SSH in as root:
 
 ```bash
 ssh root@your-vps-ip
 
-# Download and run (or copy/paste the script)
-bash setup.sh
+# Install git if not present
+apt update && apt install -y git
+
+# Clone the repo
+mkdir -p /opt
+git clone git@github.com:phnxco-solution/infrastructure.git /opt/infrastructure
+
+# Run the setup script
+bash /opt/infrastructure/scripts/setup.sh
 ```
 
 This script:
-- Installs Docker, git, htop, ufw, fail2ban
+- Installs Docker, htop, ufw, fail2ban
 - Creates a `deploy` user with your SSH key (copies from root)
 - Configures firewall (only SSH + 80 + 443)
 - Creates the `/opt/` directory structure
@@ -87,15 +94,7 @@ ssh deploy@your-vps-ip
 > **Warning:** The script disables root login and password authentication.
 > Make sure your SSH key works for the `deploy` user before disconnecting.
 
-### Step 2: Clone the infrastructure repo
-
-```bash
-cd /opt
-git clone git@github.com:phnxco-solution/infrastructure.git
-cd infrastructure
-```
-
-### Step 3: Create the .env file
+### Step 2: Create the .env file
 
 ```bash
 cp .env.example .env
@@ -128,7 +127,7 @@ openssl rand -base64 32  # Use for REDIS_PASSWORD
 
 > **Important:** Save these passwords somewhere safe. The Redis password is needed in every app's `.env`.
 
-### Step 4: Set up Cloudflare Origin Certificate
+### Step 3: Set up Cloudflare Origin Certificate
 
 1. Go to **Cloudflare Dashboard → your domain → SSL/TLS → Origin Server**
 2. Click **Create Certificate**
@@ -145,7 +144,7 @@ chmod 600 traefik/certs/origin-key.pem
 
 > **Cloudflare SSL/TLS mode** must be set to **Full (strict)** for Origin Certificates to work.
 
-### Step 5: Start the infrastructure
+### Step 4: Start the infrastructure
 
 ```bash
 cd /opt/infrastructure
@@ -170,7 +169,7 @@ https://traefik.phnx-solution.com
 
 Log in with the credentials you set in `.env`.
 
-### Step 6: Create app databases
+### Step 5: Create app databases
 
 For each Laravel app that needs a database:
 

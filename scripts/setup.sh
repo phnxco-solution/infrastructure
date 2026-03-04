@@ -1,7 +1,6 @@
 #!/bin/bash
 # VPS provisioning script — run once as root on a fresh server
-# Usage: curl -sSL <raw-github-url> | bash
-#    or: bash setup.sh
+# Usage: bash /opt/infrastructure/scripts/setup.sh
 
 set -euo pipefail
 
@@ -100,6 +99,6 @@ echo ""
 echo "=== Setup complete ==="
 echo "Next steps:"
 echo "  1. Log out and log back in as: ssh deploy@<server-ip>"
-echo "  2. Clone infrastructure repo to /opt/infrastructure/"
-echo "  3. Add .env and Cloudflare Origin Certs"
+echo "  2. Create .env from .env.example and fill in secrets"
+echo "  3. Add Cloudflare Origin Certificate to traefik/certs/"
 echo "  4. Run: cd /opt/infrastructure && docker compose up -d"
