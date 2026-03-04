@@ -10,29 +10,21 @@ Production-ready Docker setup for Laravel + Vue apps on the shared infrastructur
 | `docker/Dockerfile.nginx` | Nginx image with baked-in frontend assets (no shared volumes) |
 | `docker/entrypoint.sh` | CONTAINER_ROLE-based startup: migrations, storage link, optimize |
 | `docker/nginx.conf` | Gzip, fastcgi buffering, static asset caching, health endpoint |
-| `docker/docker-compose.prod.yml` | Production services: app, nginx, worker (uses `{{APP_NAME}}`, `{{APP_DOMAIN}}`) |
-| `docker-compose.yml` | Local dev: app, vite, nginx, worker, mysql, redis |
+| `docker/docker-compose.prod.yml` | Production services: app, nginx, worker, scheduler (uses `{{APP_NAME}}`, `{{APP_DOMAIN}}`) |
+| `docker-compose.yml` | Local dev: app, vite, nginx, worker, scheduler, mysql, redis |
 | `.dockerignore` | Excludes node_modules, vendor, tests, etc. from Docker context |
 | `.github/workflows/deploy.yml` | GHA: builds 2 images (app + nginx), deploys via SSH (uses `{{APP_NAME}}`) |
 
 ## Quick Start
 
+Copy the templates into your app repo during development. The files become part of the app repo and get cloned to the VPS with it.
+
 ```bash
-# From your Laravel app's repo root:
-APP_NAME="my-app"
-APP_DOMAIN="my-app.phnx-solution.com"
-
-# Copy all template files
-cp -r /opt/infrastructure/templates/laravel/docker ./docker
-cp /opt/infrastructure/templates/laravel/.dockerignore ./.dockerignore
-cp /opt/infrastructure/templates/laravel/docker-compose.yml ./docker-compose.yml
-mkdir -p .github/workflows
-cp /opt/infrastructure/templates/laravel/.github/workflows/deploy.yml .github/workflows/deploy.yml
-
-# Replace placeholders
-sed -i "s/{{APP_NAME}}/$APP_NAME/g" docker/docker-compose.prod.yml .github/workflows/deploy.yml
-sed -i "s/{{APP_DOMAIN}}/$APP_DOMAIN/g" docker/docker-compose.prod.yml
+# From your app's repo root:
+bash /path/to/infrastructure/templates/laravel/init.sh my-app my-app.phnx-solution.com
 ```
+
+This copies all files and replaces `{{APP_NAME}}`/`{{APP_DOMAIN}}` placeholders.
 
 ## Placeholders
 
@@ -45,25 +37,12 @@ Only two files contain placeholders:
 
 ## What to Customize
 
-- **Dockerfile**: Remove PHP extensions you don't need (gd, intl, bcmath, etc.) or add new ones
-- **Dockerfile**: Adjust `pm.max_children` in the FPM pool config based on available memory
-- **nginx.conf**: Adjust `client_max_body_size` if your app handles larger uploads
-- **docker-compose.prod.yml**: Adjust memory limits per service
-- **docker-compose.prod.yml**: Add a scheduler service if the app has scheduled commands:
+The template includes all services by default (vite, worker, scheduler). Remove what your project doesn't need — e.g. drop `scheduler` if there are no scheduled commands, `worker` if there are no queued jobs, or `vite` if there's no frontend.
 
-```yaml
-  scheduler:
-    image: ghcr.io/phnxco-solution/<app-name>:latest
-    restart: unless-stopped
-    env_file: ../.env
-    command: php artisan schedule:work
-    networks:
-      - backend
-    deploy:
-      resources:
-        limits:
-          memory: 64M
-```
+- **Dockerfile** — remove PHP extensions you don't need (gd, intl, bcmath, etc.) or add new ones
+- **Dockerfile** — adjust `pm.max_children` in the FPM pool config based on available memory
+- **nginx.conf** — adjust `client_max_body_size` if your app handles larger uploads
+- **docker-compose.prod.yml** — adjust memory limits per service
 
 ## Architecture
 

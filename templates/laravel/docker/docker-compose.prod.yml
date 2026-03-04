@@ -59,6 +59,18 @@ services:
         limits:
           memory: 128M
 
+  scheduler:
+    image: ghcr.io/phnxco-solution/{{APP_NAME}}:latest
+    restart: unless-stopped
+    env_file: ../.env
+    command: php artisan schedule:work
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
 networks:
   traefik-public:
     external: true

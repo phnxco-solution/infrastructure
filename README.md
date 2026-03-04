@@ -195,55 +195,14 @@ Once the infrastructure is running, follow these steps to add any new app.
 
 ### 1. Copy Docker files from templates
 
+Copy the templates into your app repo during development. These files become part of the app and get cloned to the VPS with it.
+
+**[Laravel](templates/laravel/)** — full stack Laravel + Vue projects. See [`templates/laravel/README.md`](templates/laravel/README.md) for customization details.
+
 ```bash
-# Set your app name and domain
-APP_NAME="my-app"
-APP_DOMAIN="my-app.phnx-solution.com"
-
 # From your app's repo root:
-cp -r /opt/infrastructure/templates/laravel/docker ./docker
-cp /opt/infrastructure/templates/laravel/.dockerignore ./.dockerignore
-cp /opt/infrastructure/templates/laravel/docker-compose.yml ./docker-compose.yml
-mkdir -p .github/workflows
-cp /opt/infrastructure/templates/laravel/.github/workflows/deploy.yml .github/workflows/deploy.yml
-
-# Replace placeholders
-sed -i "s/{{APP_NAME}}/$APP_NAME/g" docker/docker-compose.prod.yml .github/workflows/deploy.yml
-sed -i "s/{{APP_DOMAIN}}/$APP_DOMAIN/g" docker/docker-compose.prod.yml
+bash /path/to/infrastructure/templates/laravel/init.sh my-app my-app.phnx-solution.com
 ```
-
-**What each file does:**
-
-| File | Purpose |
-|------|---------|
-| `docker/Dockerfile` | Multi-target PHP image (dev + production), OPcache with JIT, Redis, GD |
-| `docker/Dockerfile.nginx` | Nginx image with baked-in frontend assets (no shared volumes needed) |
-| `docker/entrypoint.sh` | Runs migrations, storage link, and optimize on container start |
-| `docker/nginx.conf` | Gzip, fastcgi buffering, static asset caching, `/health` endpoint |
-| `docker/docker-compose.prod.yml` | Production: app (backend network), nginx (Traefik labels), worker |
-| `docker-compose.yml` | Local dev: app, vite, nginx, worker, mysql, redis |
-| `.dockerignore` | Keeps Docker context small (excludes vendor, node_modules, tests) |
-| `.github/workflows/deploy.yml` | Builds 2 images (app + nginx), deploys via SSH to VPS |
-
-**What to customize:**
-- **Dockerfile** — remove PHP extensions you don't need (gd, intl, bcmath, etc.)
-- **docker-compose.prod.yml** — adjust memory limits, add a scheduler if needed:
-
-```yaml
-  scheduler:
-    image: ghcr.io/phnxco-solution/<app-name>:latest
-    restart: unless-stopped
-    env_file: ../.env
-    command: php artisan schedule:work
-    networks:
-      - backend
-    deploy:
-      resources:
-        limits:
-          memory: 64M
-```
-
-> See [`templates/laravel/README.md`](templates/laravel/README.md) for full customization details.
 
 ### 2. Set up GitHub Secrets
 
