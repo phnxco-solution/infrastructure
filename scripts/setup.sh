@@ -33,11 +33,11 @@ ufw --force enable
 echo "=== Install Docker ==="
 if ! command -v docker &>/dev/null; then
   curl -fsSL https://get.docker.com | sh
-  usermod -aG docker deploy
   echo "Docker installed"
 else
   echo "Docker already installed"
 fi
+usermod -aG docker deploy
 
 echo "=== Configure Docker daemon ==="
 mkdir -p /etc/docker
