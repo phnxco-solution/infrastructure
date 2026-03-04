@@ -62,8 +62,8 @@ Traefik dashboard: traefik.phnx-solution.com
 
 ## Adding a New App
 
-1. Add Docker files to the app repo: `docker/Dockerfile`, `docker/entrypoint.sh`, `docker/nginx.conf`, `docker/docker-compose.prod.yml`, `.dockerignore`
-2. Add `.github/workflows/deploy.yml` (build → GHCR → SSH deploy)
+1. Copy Docker files from `templates/laravel/` into the app repo, replace `{{APP_NAME}}` and `{{APP_DOMAIN}}` placeholders
+2. Customize as needed (remove unused PHP extensions, adjust memory limits, add scheduler)
 3. Clone repo to `/opt/apps/<name>/` on VPS, add `.env`
 4. Traefik auto-discovers via labels — no infrastructure changes needed
 

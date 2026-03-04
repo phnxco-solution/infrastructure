@@ -1,0 +1,66 @@
+services:
+  app:
+    image: ghcr.io/phnxco-solution/{{APP_NAME}}:latest
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      CONTAINER_ROLE: app
+    volumes:
+      - /opt/volumes/apps/{{APP_NAME}}/storage:/var/www/html/storage
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  nginx:
+    image: ghcr.io/phnxco-solution/{{APP_NAME}}-nginx:latest
+    restart: unless-stopped
+    volumes:
+      - /opt/volumes/apps/{{APP_NAME}}/storage/app/public:/var/www/html/public/storage:ro
+    networks:
+      - traefik-public
+      - backend
+    depends_on:
+      app:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.{{APP_NAME}}.rule=Host(`{{APP_DOMAIN}}`)"
+      - "traefik.http.routers.{{APP_NAME}}.entrypoints=websecure"
+      - "traefik.http.routers.{{APP_NAME}}.tls=true"
+      - "traefik.http.services.{{APP_NAME}}.loadbalancer.server.port=80"
+      - "traefik.http.services.{{APP_NAME}}.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.{{APP_NAME}}.loadbalancer.healthcheck.interval=15s"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  worker:
+    image: ghcr.io/phnxco-solution/{{APP_NAME}}:latest
+    restart: unless-stopped
+    env_file: ../.env
+    command: php artisan queue:work redis --max-jobs=1000 --max-time=3600 --tries=3 --timeout=90
+    volumes:
+      - /opt/volumes/apps/{{APP_NAME}}/storage:/var/www/html/storage
+    networks:
+      - backend
+    stop_signal: SIGTERM
+    stop_grace_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+networks:
+  traefik-public:
+    external: true
+  backend:
+    external: true
