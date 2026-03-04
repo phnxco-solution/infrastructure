@@ -4,16 +4,29 @@
 
 set -euo pipefail
 
+# Source credentials (needed when running via cron)
+source /opt/infrastructure/.env
+
 BACKUP_DIR="/opt/backups/mysql"
 RETENTION_DAYS=14
 DATE=$(date +%Y-%m-%d_%H%M)
 
 mkdir -p "$BACKUP_DIR"
 
+# Verify MySQL is reachable
+if ! docker exec mysql mysqladmin -u root -p"${MYSQL_ROOT_PASSWORD}" ping --silent > /dev/null 2>&1; then
+  echo "[$(date)] ERROR: MySQL is not running or unreachable" >&2
+  exit 1
+fi
+
 # Get list of databases (exclude system DBs)
-DATABASES=$(docker exec mysql mysqladmin -u root -p"${MYSQL_ROOT_PASSWORD}" status > /dev/null 2>&1 && \
-  docker exec mysql mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -N -e \
+DATABASES=$(docker exec mysql mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -N -e \
   "SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('mysql','information_schema','performance_schema','sys');" 2>/dev/null)
+
+if [ -z "$DATABASES" ]; then
+  echo "[$(date)] ERROR: No databases found to back up" >&2
+  exit 1
+fi
 
 for DB in $DATABASES; do
   FILENAME="${BACKUP_DIR}/${DB}_${DATE}.sql.gz"
