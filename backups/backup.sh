@@ -1,11 +1,8 @@
 #!/bin/bash
 # Daily MySQL backup — run via cron
-# Dumps each database individually, gzipped, 14-day retention
+# Dumps each database individually, gzipped, 7-day retention
 
 set -euo pipefail
-
-# Source credentials (needed when running via cron)
-source /opt/infrastructure/.env
 
 BACKUP_DIR="/opt/backups/mysql"
 RETENTION_DAYS=7
@@ -14,8 +11,8 @@ HAS_ERROR=0
 
 mkdir -p "$BACKUP_DIR"
 
-# Write temporary defaults file inside the container (avoids password in process list)
-docker exec mysql sh -c "printf '[client]\nuser=root\npassword=%s\n' '${MYSQL_ROOT_PASSWORD}' > /tmp/.backup.cnf && chmod 600 /tmp/.backup.cnf"
+# Write temporary defaults file inside the container (single quotes prevent host-side expansion)
+docker exec mysql sh -c 'printf "[client]\nuser=root\npassword=%s\n" "$MYSQL_ROOT_PASSWORD" > /tmp/.backup.cnf && chmod 600 /tmp/.backup.cnf'
 trap 'docker exec mysql rm -f /tmp/.backup.cnf' EXIT
 
 # Verify MySQL is reachable
