@@ -38,6 +38,8 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "127.0.0.1:3306:3306"
     volumes:
       - /opt/volumes/mysql:/var/lib/mysql
       - ./mysql/my.cnf:/etc/mysql/conf.d/custom.cnf:ro
