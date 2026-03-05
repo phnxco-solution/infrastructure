@@ -8,7 +8,7 @@ set -euo pipefail
 source /opt/infrastructure/.env
 
 BACKUP_DIR="/opt/backups/mysql"
-RETENTION_DAYS=14
+RETENTION_DAYS=7
 DATE=$(date +%Y-%m-%d_%H%M)
 HAS_ERROR=0
 
