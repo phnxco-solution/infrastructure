@@ -1,0 +1,12 @@
+node_modules
+.output
+.nuxt
+.git
+.env
+.env.*
+!.env.example
+storage/
+*.md
+.idea
+.vscode
+docker-compose.yml
