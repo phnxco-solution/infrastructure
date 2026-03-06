@@ -79,9 +79,18 @@ jobs:
 
             cd ${{ env.APP_DIR }}
 
-            docker compose -f docker-compose.yml up -d --force-recreate --remove-orphans
+            # Run migrations using new image while old containers still serve traffic
+            # -T disables TTY (required for non-interactive SSH)
+            docker compose run --rm -T app php artisan migrate --force --isolated
 
-            sleep 5
-            docker compose -f docker-compose.yml ps
+            # Recreate app, wait for healthy (--wait blocks until healthcheck passes)
+            docker compose up -d --no-deps --wait --wait-timeout 60 app
 
+            # Recreate nginx (Traefik-facing service — get it up right after app)
+            docker compose up -d --no-deps --wait --wait-timeout 30 nginx --remove-orphans
+
+            # Recreate background services (no traffic impact)
+            docker compose up -d --no-deps worker scheduler
+
+            docker compose ps
             docker image prune -af --filter "until=168h"

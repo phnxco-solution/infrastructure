@@ -64,9 +64,11 @@ jobs:
 
             cd ${{ env.APP_DIR }}
 
-            docker compose -f docker-compose.yml up -d --force-recreate --remove-orphans
+            # Run migrations using new image while old container still serves traffic
+            docker compose run --rm -T app ./node_modules/.bin/drizzle-kit migrate
 
-            sleep 5
-            docker compose -f docker-compose.yml ps
+            # Recreate app, wait for healthy
+            docker compose up -d --wait --wait-timeout 60 --remove-orphans
 
+            docker compose ps
             docker image prune -af --filter "until=168h"
