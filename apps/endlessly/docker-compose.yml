@@ -9,6 +9,7 @@ services:
       NODE_ENV: production
     volumes:
       - /opt/volumes/apps/endlessly/storage:/app/storage
+      - /opt/volumes/apps/endlessly/logs:/app/logs
     networks:
       - traefik-public
       - backend

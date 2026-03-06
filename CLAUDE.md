@@ -101,3 +101,39 @@ docker compose logs -f <service>
 # Run backup manually
 /opt/infrastructure/backups/backup.sh
 ```
+
+## Debugging / Logs
+
+When something breaks, here's where to look:
+
+| What broke | Where to look | Command |
+|------------|---------------|---------|
+| **Laravel app** | Docker logs (real-time) | `docker logs <app>-app-1 --tail 100` |
+| | Persistent daily logs | `cat /opt/volumes/apps/<name>/storage/logs/laravel-$(date +%Y-%m-%d).log` |
+| | Worker/scheduler | Same files — shares mounted storage volume |
+| **Nuxt app** | Docker logs (real-time) | `docker logs <app>-app-1 --tail 100` |
+| | Persistent daily logs | `cat /opt/volumes/apps/<name>/logs/app-$(date +%Y-%m-%d).log` |
+| **Nginx sidecar** | Docker logs | `docker logs <app>-nginx-1 --tail 100` |
+| **Traefik** | Docker logs (WARN+ only) | `docker logs traefik --tail 100` |
+| **MySQL** | Docker logs | `docker logs mysql --tail 100` |
+| | Slow query log | `docker exec mysql cat /var/lib/mysql/slow.log` |
+| **Redis** | Docker logs | `docker logs redis --tail 100` |
+| **Container restarts** | Autoheal + Docker events | `docker events --filter event=restart --since 1h` |
+
+**Log retention:**
+- Docker json-file logs: 3 x 10MB (daemon config), lost on container recreation
+- Laravel daily logs: 14 days (Laravel default `LOG_DAILY_DAYS`)
+- Nuxt daily logs: 14 days (cron cleanup in `scripts/setup.sh`)
+- MySQL slow log: rotated weekly (cron in `scripts/setup.sh`)
+
+**Quick searches:**
+```bash
+# Search Laravel logs for errors today
+grep -i error /opt/volumes/apps/<name>/storage/logs/laravel-$(date +%Y-%m-%d).log
+
+# Search Nuxt logs for errors today
+grep -i error /opt/volumes/apps/<name>/logs/app-$(date +%Y-%m-%d).log
+
+# Find which container restarted recently
+docker ps --filter "status=running" --format "{{.Names}} {{.Status}}" | grep -i restart
+```

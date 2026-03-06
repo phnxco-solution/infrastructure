@@ -9,6 +9,7 @@ services:
       NODE_ENV: production
     volumes:
       - /opt/volumes/apps/{{APP_NAME}}/storage:/app/storage
+      - /opt/volumes/apps/{{APP_NAME}}/logs:/app/logs
     networks:
       - traefik-public
       - backend

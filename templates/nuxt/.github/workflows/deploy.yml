@@ -64,6 +64,9 @@ jobs:
 
             cd ${{ env.APP_DIR }}
 
+            # Ensure log directory exists with correct ownership
+            mkdir -p /opt/volumes/apps/{{APP_NAME}}/logs
+
             # Run migrations using new image while old container still serves traffic
             docker compose run --rm -T app ./node_modules/.bin/drizzle-kit migrate
 

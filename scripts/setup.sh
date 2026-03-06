@@ -91,6 +91,12 @@ CRON_CONTENT=$(cat <<'CRON'
 
 # Weekly Docker cleanup on Sunday at 5 AM
 0 5 * * 0 docker image prune -af --filter "until=168h" >> /var/log/docker-prune.log 2>&1
+
+# Weekly MySQL slow log truncation on Sunday at 2:30 AM
+30 2 * * 0 docker exec mysql sh -c 'cat /dev/null > /var/lib/mysql/slow.log' 2>/dev/null
+
+# Daily cleanup of old app log files (14-day retention)
+0 2 * * * find /opt/volumes/apps/*/logs -name "app-*.log" -mtime +14 -delete 2>/dev/null
 CRON
 )
 echo "$CRON_CONTENT" | crontab -u deploy -
