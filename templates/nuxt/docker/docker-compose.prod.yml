@@ -1,3 +1,5 @@
+name: {{APP_NAME}}
+
 services:
   app:
     image: ghcr.io/phnxco-solution/{{APP_NAME}}:latest
