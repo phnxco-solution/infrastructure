@@ -5,6 +5,8 @@ services:
     image: ghcr.io/phnxco-solution/endlessly:latest
     restart: unless-stopped
     env_file: .env
+    environment:
+      NODE_ENV: production
     volumes:
       - /opt/volumes/apps/endlessly/storage:/app/storage
     networks:

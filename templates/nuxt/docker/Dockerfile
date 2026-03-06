@@ -25,7 +25,7 @@ RUN npm run build
 # Migration dependencies (pure JS, no native compilation needed)
 RUN mkdir /migrate \
     && cd /migrate \
-    && npm install drizzle-kit mysql2
+    && npm install drizzle-kit drizzle-orm mysql2
 
 # ── Production target ────────────────────────────────────────────────
 FROM node:22-alpine AS production
