@@ -12,7 +12,7 @@ bash /path/to/infrastructure/templates/nuxt/init.sh <app-name> <app-domain>
 bash /opt/infrastructure/templates/nuxt/init.sh endlessly endlessly.phnx-solution.com
 ```
 
-This copies all Docker files and replaces `{{APP_NAME}}` and `{{APP_DOMAIN}}` placeholders.
+This copies Docker files into the app repo, replaces `{{APP_NAME}}`/`{{APP_DOMAIN}}` placeholders, and creates `apps/<name>/docker-compose.yml` in the infrastructure repo.
 
 ## Files
 
@@ -79,10 +79,11 @@ docker compose up
 mkdir -p /opt/volumes/apps/<app-name>/storage
 chown 1000:1000 /opt/volumes/apps/<app-name>/storage
 
-# Clone app
-cd /opt/apps/<app-name>
+# Pull infrastructure repo (compose file is already in apps/<name>/)
+cd /opt/infrastructure && git pull
 
 # Add .env with production values
+cp /opt/infrastructure/apps/<app-name>/.env.example /opt/infrastructure/apps/<app-name>/.env
 ```
 
 ### Environment Variables
@@ -118,11 +119,11 @@ Single container on both networks:
 Pushes to `main` trigger the GitHub Actions workflow:
 1. Builds production Docker image
 2. Pushes to GHCR
-3. SSHs to VPS, pulls image, recreates container
+3. SSHs to VPS, pulls image, recreates container from `/opt/infrastructure/apps/<name>/docker-compose.yml`
 
 ## Customization
 
-- **Memory limit**: Default 256M in prod compose. Adjust in `docker/docker-compose.prod.yml`
+- **Memory limit**: Default 256M in prod compose. Adjust in the infrastructure repo's `apps/<name>/docker-compose.yml`
 - **Migration path**: Default `server/database/migrations/`. Change in Dockerfile if your project uses a different path
 - **Build tools**: `python3 make g++` installed in dev/build stages for native addons (sharp, bcrypt). Remove if not needed
 - **Storage volume**: Mounted at `/app/storage`. Remove from compose if not needed

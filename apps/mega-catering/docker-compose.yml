@@ -1,14 +1,14 @@
-name: {{APP_NAME}}
+name: mega-catering
 
 services:
   app:
-    image: ghcr.io/phnxco-solution/{{APP_NAME}}:latest
+    image: ghcr.io/phnxco-solution/mega-catering:latest
     restart: unless-stopped
     env_file: .env
     environment:
       CONTAINER_ROLE: app
     volumes:
-      - /opt/volumes/apps/{{APP_NAME}}/storage:/var/www/html/storage
+      - /opt/volumes/apps/mega-catering/storage:/var/www/html/storage
     networks:
       - backend
     deploy:
@@ -22,10 +22,10 @@ services:
       retries: 3
 
   nginx:
-    image: ghcr.io/phnxco-solution/{{APP_NAME}}-nginx:latest
+    image: ghcr.io/phnxco-solution/mega-catering-nginx:latest
     restart: unless-stopped
     volumes:
-      - /opt/volumes/apps/{{APP_NAME}}/storage/app/public:/var/www/html/public/storage:ro
+      - /opt/volumes/apps/mega-catering/storage/app/public:/var/www/html/public/storage:ro
     networks:
       - traefik-public
       - backend
@@ -34,24 +34,24 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.{{APP_NAME}}.rule=Host(`{{APP_DOMAIN}}`)"
-      - "traefik.http.routers.{{APP_NAME}}.entrypoints=websecure"
-      - "traefik.http.routers.{{APP_NAME}}.tls=true"
-      - "traefik.http.services.{{APP_NAME}}.loadbalancer.server.port=80"
-      - "traefik.http.services.{{APP_NAME}}.loadbalancer.healthcheck.path=/health"
-      - "traefik.http.services.{{APP_NAME}}.loadbalancer.healthcheck.interval=15s"
+      - "traefik.http.routers.mega-catering.rule=Host(`mega-catering.phnx-solution.com`)"
+      - "traefik.http.routers.mega-catering.entrypoints=websecure"
+      - "traefik.http.routers.mega-catering.tls=true"
+      - "traefik.http.services.mega-catering.loadbalancer.server.port=80"
+      - "traefik.http.services.mega-catering.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.mega-catering.loadbalancer.healthcheck.interval=15s"
     deploy:
       resources:
         limits:
           memory: 64M
 
   worker:
-    image: ghcr.io/phnxco-solution/{{APP_NAME}}:latest
+    image: ghcr.io/phnxco-solution/mega-catering:latest
     restart: unless-stopped
     env_file: .env
     command: php artisan queue:work redis --max-jobs=1000 --max-time=3600 --tries=3 --backoff=15 --timeout=90 --memory=128
     volumes:
-      - /opt/volumes/apps/{{APP_NAME}}/storage:/var/www/html/storage
+      - /opt/volumes/apps/mega-catering/storage:/var/www/html/storage
     networks:
       - backend
     depends_on:
@@ -71,12 +71,12 @@ services:
           memory: 192M
 
   scheduler:
-    image: ghcr.io/phnxco-solution/{{APP_NAME}}:latest
+    image: ghcr.io/phnxco-solution/mega-catering:latest
     restart: unless-stopped
     env_file: .env
     command: php artisan schedule:work
     volumes:
-      - /opt/volumes/apps/{{APP_NAME}}/storage:/var/www/html/storage
+      - /opt/volumes/apps/mega-catering/storage:/var/www/html/storage
     networks:
       - backend
     depends_on:

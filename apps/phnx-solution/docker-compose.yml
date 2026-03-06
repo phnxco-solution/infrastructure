@@ -1,0 +1,31 @@
+name: phnx-solution
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    volumes:
+      - /opt/volumes/apps/phnx-solution/public:/usr/share/nginx/html:ro
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.phnx-solution.rule=Host(`phnx-solution.com`)"
+      - "traefik.http.routers.phnx-solution.entrypoints=websecure"
+      - "traefik.http.routers.phnx-solution.tls=true"
+      - "traefik.http.services.phnx-solution.loadbalancer.server.port=80"
+      - "traefik.http.services.phnx-solution.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.phnx-solution.loadbalancer.healthcheck.interval=15s"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  traefik-public:
+    external: true

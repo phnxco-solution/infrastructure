@@ -34,18 +34,27 @@ Two Docker networks:
 
 ```
 /opt/
-├── infrastructure/       # This repo (cloned here)
-├── apps/<app-name>/      # Each app repo cloned here
-│   ├── docker/           # Dockerfile, compose, nginx, entrypoint
-│   └── .env              # Production secrets (not in git)
+├── infrastructure/              # This repo (cloned here)
+│   ├── docker-compose.yml       # Traefik, MySQL, Redis, etc.
+│   ├── apps/                    # Per-app production compose + .env
+│   │   ├── mega-catering/
+│   │   │   ├── docker-compose.yml
+│   │   │   └── .env             # Production secrets (not in git)
+│   │   ├── endlessly/
+│   │   │   ├── docker-compose.yml
+│   │   │   └── .env
+│   │   └── phnx-solution/
+│   │       ├── docker-compose.yml
+│   │       └── .env
+│   └── ...
 ├── volumes/
-│   ├── mysql/            # MySQL data
-│   ├── redis/            # Redis data
-│   ├── uptime-kuma/      # Uptime Kuma data
-│   └── apps/<name>/storage/  # Laravel storage dirs
+│   ├── mysql/                   # MySQL data
+│   ├── redis/                   # Redis data
+│   ├── uptime-kuma/             # Uptime Kuma data
+│   └── apps/<name>/storage/     # Laravel/Nuxt storage dirs
 └── backups/
-    ├── mysql/            # Daily dumps (14-day retention)
-    └── volumes/          # Weekly tars (30-day retention)
+    ├── mysql/                   # Daily dumps (14-day retention)
+    └── volumes/                 # Weekly tars (30-day retention)
 ```
 
 ## Current Apps
@@ -62,10 +71,10 @@ Traefik dashboard: traefik.phnx-solution.com
 
 ## Adding a New App
 
-1. Copy Docker files from `templates/laravel/` into the app repo, replace `{{APP_NAME}}` and `{{APP_DOMAIN}}` placeholders
+1. Run `init.sh` from the template (`templates/laravel/` or `templates/nuxt/`) — copies Docker files into the app repo and creates a production compose file in `apps/<name>/`
 2. Customize as needed (remove unused PHP extensions, adjust memory limits, add scheduler)
-3. Clone repo to `/opt/apps/<name>/` on VPS, add `.env`
-4. Traefik auto-discovers via labels — no infrastructure changes needed
+3. On VPS: `git pull` the infrastructure repo, add `.env` to `apps/<name>/`
+4. Traefik auto-discovers via labels — no other infrastructure changes needed
 
 ## Docker Networking for App .env
 
@@ -85,7 +94,7 @@ SESSION_DRIVER=redis
 cd /opt/infrastructure && docker compose up -d
 
 # Start an app
-cd /opt/apps/<name> && docker compose -f docker/docker-compose.prod.yml up -d
+docker compose -f /opt/infrastructure/apps/<name>/docker-compose.yml up -d
 
 # View logs
 docker compose logs -f <service>

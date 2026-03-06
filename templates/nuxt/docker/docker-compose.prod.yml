@@ -4,7 +4,7 @@ services:
   app:
     image: ghcr.io/phnxco-solution/{{APP_NAME}}:latest
     restart: unless-stopped
-    env_file: ../.env
+    env_file: .env
     volumes:
       - /opt/volumes/apps/{{APP_NAME}}/storage:/app/storage
     networks:

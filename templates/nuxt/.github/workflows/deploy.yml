@@ -7,7 +7,7 @@ on:
 
 env:
   IMAGE_NAME: ghcr.io/phnxco-solution/{{APP_NAME}}
-  APP_DIR: /opt/apps/{{APP_NAME}}
+  APP_DIR: /opt/infrastructure/apps/{{APP_NAME}}
 
 jobs:
   build-and-push:
@@ -64,9 +64,9 @@ jobs:
 
             cd ${{ env.APP_DIR }}
 
-            docker compose -f docker/docker-compose.prod.yml up -d --force-recreate --remove-orphans
+            docker compose -f docker-compose.yml up -d --force-recreate --remove-orphans
 
             sleep 5
-            docker compose -f docker/docker-compose.prod.yml ps
+            docker compose -f docker-compose.yml ps
 
             docker image prune -af --filter "until=168h"

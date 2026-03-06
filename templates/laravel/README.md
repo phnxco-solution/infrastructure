@@ -10,21 +10,21 @@ Production-ready Docker setup for Laravel + Vue apps on the shared infrastructur
 | `docker/Dockerfile.nginx` | Nginx image with baked-in frontend assets (no shared volumes) |
 | `docker/entrypoint.sh` | CONTAINER_ROLE-based startup: migrations, storage link, optimize |
 | `docker/nginx.conf` | Gzip, fastcgi buffering, static asset caching, health endpoint |
-| `docker/docker-compose.prod.yml` | Production services: app, nginx, worker, scheduler (uses `{{APP_NAME}}`, `{{APP_DOMAIN}}`) |
+| `docker/docker-compose.prod.yml` | Production template: app, nginx, worker, scheduler (uses `{{APP_NAME}}`, `{{APP_DOMAIN}}`) |
 | `docker-compose.yml` | Local dev: app, vite, nginx, worker, scheduler, mysql, redis |
 | `.dockerignore` | Excludes node_modules, vendor, tests, etc. from Docker context |
 | `.github/workflows/deploy.yml` | GHA: builds 2 images (app + nginx), deploys via SSH (uses `{{APP_NAME}}`) |
 
 ## Quick Start
 
-Copy the templates into your app repo during development. The files become part of the app repo and get cloned to the VPS with it.
+Run `init.sh` from your app's repo root. This copies Docker files into the app repo and creates a production compose file in the infrastructure repo's `apps/` directory.
 
 ```bash
 # From your app's repo root:
 bash /path/to/infrastructure/templates/laravel/init.sh my-app my-app.phnx-solution.com
 ```
 
-This copies all files and replaces `{{APP_NAME}}`/`{{APP_DOMAIN}}` placeholders.
+This copies all files, replaces `{{APP_NAME}}`/`{{APP_DOMAIN}}` placeholders, and creates `apps/<name>/docker-compose.yml` in the infrastructure repo.
 
 ## Placeholders
 
