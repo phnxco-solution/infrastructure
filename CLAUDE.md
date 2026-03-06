@@ -51,7 +51,9 @@ Two Docker networks:
 │   ├── mysql/                   # MySQL data
 │   ├── redis/                   # Redis data
 │   ├── uptime-kuma/             # Uptime Kuma data
-│   └── apps/<name>/storage/     # Laravel/Nuxt storage dirs
+│   └── apps/<name>/
+│       ├── storage/             # Laravel/Nuxt storage dirs
+│       └── logs/                # Nuxt daily logs (app-YYYY-MM-DD.log)
 └── backups/
     ├── mysql/                   # Daily dumps (14-day retention)
     └── volumes/                 # Weekly tars (30-day retention)

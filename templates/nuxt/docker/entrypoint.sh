@@ -8,7 +8,7 @@ if [ "$NODE_ENV" != "production" ]; then
 fi
 
 # Persistent daily logging (production only, when /app/logs is mounted)
-if [ "$NODE_ENV" = "production" ] && [ -d "/app/logs" ]; then
+if [ "$NODE_ENV" = "production" ] && [ -d "/app/logs" ] && [ "$(basename "${1:-}")" = "dumb-init" ]; then
     FIFO="/tmp/logpipe"
     rm -f "$FIFO" && mkfifo "$FIFO"
 
