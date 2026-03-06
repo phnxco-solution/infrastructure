@@ -33,6 +33,10 @@ Internet → Cloudflare (DNS + SSL) → VPS:443 → Traefik
 infrastructure/
 ├── docker-compose.yml       # Traefik + MySQL + Redis + Uptime Kuma + Autoheal
 ├── .env.example             # Template for secrets
+├── apps/                    # Per-app production compose + .env (gitignored)
+│   ├── mega-catering/
+│   ├── endlessly/
+│   └── phnx-solution/
 ├── traefik/
 │   ├── traefik.yml          # Entrypoints, Cloudflare IPs, Docker provider
 │   └── dynamic/
@@ -45,7 +49,8 @@ infrastructure/
 │   ├── backup.sh            # Daily MySQL dumps (14-day retention)
 │   └── volume-backup.sh     # Weekly storage backups (30-day retention)
 └── templates/
-    └── laravel/             # Copyable Docker files for new Laravel apps
+    ├── laravel/             # Docker files for new Laravel apps
+    └── nuxt/                # Docker files for new Nuxt apps
 ```
 
 ---
@@ -195,13 +200,17 @@ Once the infrastructure is running, follow these steps to add any new app.
 
 ### 1. Copy Docker files from templates
 
-Copy the templates into your app repo during development. These files become part of the app and get cloned to the VPS with it.
+Run `init.sh` from your app's repo root. This copies Docker files into the app repo and creates a production compose file in the infrastructure repo's `apps/` directory.
 
 **[Laravel](templates/laravel/)** — full stack Laravel + Vue projects. See [`templates/laravel/README.md`](templates/laravel/README.md) for customization details.
+
+**[Nuxt](templates/nuxt/)** — Nuxt 3/4 SSR apps. See [`templates/nuxt/README.md`](templates/nuxt/README.md) for details.
 
 ```bash
 # From your app's repo root:
 bash /path/to/infrastructure/templates/laravel/init.sh my-app my-app.phnx-solution.com
+# or for Nuxt:
+bash /path/to/infrastructure/templates/nuxt/init.sh my-app my-app.phnx-solution.com
 ```
 
 ### 2. Set up GitHub Secrets
@@ -224,17 +233,14 @@ Add these secrets to your GitHub repo (or at the org level to share across repos
 ### 3. Set up on the VPS
 
 ```bash
-# Create the app directory and clone the repo
-cd /opt/apps
-git clone git@github.com:phnxco-solution/<app-name>.git
-cd <app-name>
+# Pull the infrastructure repo to get the new compose file
+cd /opt/infrastructure && git pull
 
 # Create storage directory
 mkdir -p /opt/volumes/apps/<app-name>/storage/{app/public,framework/{cache/data,sessions,views},logs}
 
-# Create the production .env
-cp .env.example .env
-nano .env
+# Create the production .env next to the compose file
+nano /opt/infrastructure/apps/<app-name>/.env
 ```
 
 **Key .env changes for Docker:**
@@ -278,9 +284,9 @@ Push to the `master` branch. GitHub Actions will build, push, and deploy automat
 For the first deploy, you can also trigger it manually on the VPS:
 
 ```bash
-cd /opt/apps/<app-name>
-docker compose -f docker/docker-compose.prod.yml pull
-docker compose -f docker/docker-compose.prod.yml up -d
+cd /opt/infrastructure/apps/<app-name>
+docker compose pull
+docker compose up -d
 ```
 
 > Migrations run automatically via the entrypoint — no separate `docker compose run` needed.
@@ -289,15 +295,16 @@ docker compose -f docker/docker-compose.prod.yml up -d
 
 ```bash
 # Check containers are running and healthy
-docker compose -f docker/docker-compose.prod.yml ps
+cd /opt/infrastructure/apps/<app-name>
+docker compose ps
 
 # Check app responds
 curl -f https://<app-domain>/health
 
 # Check logs if something is wrong
-docker compose -f docker/docker-compose.prod.yml logs app
-docker compose -f docker/docker-compose.prod.yml logs nginx
-docker compose -f docker/docker-compose.prod.yml logs worker
+docker compose logs app
+docker compose logs nginx
+docker compose logs worker
 ```
 
 ---
@@ -342,15 +349,15 @@ cd /opt/infrastructure && docker compose logs -f mysql
 cd /opt/infrastructure && docker compose logs -f redis
 
 # App
-cd /opt/apps/<name> && docker compose -f docker/docker-compose.prod.yml logs -f app
-cd /opt/apps/<name> && docker compose -f docker/docker-compose.prod.yml logs -f worker
+cd /opt/infrastructure/apps/<name> && docker compose logs -f app
+cd /opt/infrastructure/apps/<name> && docker compose logs -f worker
 ```
 
 ### Run artisan commands
 
 ```bash
-cd /opt/apps/<name>
-docker compose -f docker/docker-compose.prod.yml exec app php artisan <command>
+cd /opt/infrastructure/apps/<name>
+docker compose exec app php artisan <command>
 ```
 
 ### Database access
@@ -376,10 +383,10 @@ docker exec -it mysql mysql -u root -p
 cd /opt/infrastructure && docker compose restart
 
 # Restart an app
-cd /opt/apps/<name> && docker compose -f docker/docker-compose.prod.yml restart
+cd /opt/infrastructure/apps/<name> && docker compose restart
 
 # Restart just the worker
-cd /opt/apps/<name> && docker compose -f docker/docker-compose.prod.yml restart worker
+cd /opt/infrastructure/apps/<name> && docker compose restart worker
 ```
 
 ### Resource monitoring

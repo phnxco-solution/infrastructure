@@ -4,7 +4,7 @@ Shared Docker infrastructure for all apps on a Hostinger VPS (4GB RAM / 2 CPU).
 
 ## Stack
 
-- **Traefik v3.3** — reverse proxy, auto-discovers containers via Docker labels
+- **Traefik v3.6** — reverse proxy, auto-discovers containers via Docker labels
 - **MySQL 8.4** — shared database, tuned for 4GB VPS (384M buffer pool, performance_schema OFF)
 - **Redis 7 Alpine** — cache, queues, sessions (128mb maxmemory, allkeys-lru, password-protected)
 - **Uptime Kuma** — self-hosted uptime monitoring with Slack/email alerts (runs on same VPS — pair with external monitor like UptimeRobot for VPS-level coverage)
@@ -62,7 +62,6 @@ Two Docker networks:
 | App | Domain | Type |
 |-----|--------|------|
 | mega-catering | mega-catering.phnx-solution.com | Laravel 12 + Vue 3 |
-| we-kwik-gene | wekwikgene.phnx-solution.com | Laravel 12 + Vue 3 |
 | phnx-solution | phnx-solution.com | Static HTML |
 | endlessly | endlessly.phnx-solution.com | Nuxt 3 SSR |
 | uptime-kuma | status.phnx-solution.com | Uptime monitoring |

@@ -83,7 +83,7 @@ chown 1000:1000 /opt/volumes/apps/<app-name>/storage
 cd /opt/infrastructure && git pull
 
 # Add .env with production values
-cp /opt/infrastructure/apps/<app-name>/.env.example /opt/infrastructure/apps/<app-name>/.env
+nano /opt/infrastructure/apps/<app-name>/.env
 ```
 
 ### Environment Variables
