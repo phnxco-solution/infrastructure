@@ -11,16 +11,7 @@ services:
       - /opt/volumes/apps/endlessly/storage:/app/storage
       - /opt/volumes/apps/endlessly/logs:/app/logs
     networks:
-      - traefik-public
       - backend
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.endlessly.rule=Host(`endlessly.phnx-solution.com`)"
-      - "traefik.http.routers.endlessly.entrypoints=websecure"
-      - "traefik.http.routers.endlessly.tls=true"
-      - "traefik.http.services.endlessly.loadbalancer.server.port=3000"
-      - "traefik.http.services.endlessly.loadbalancer.healthcheck.path=/"
-      - "traefik.http.services.endlessly.loadbalancer.healthcheck.interval=15s"
     deploy:
       resources:
         limits:
@@ -31,6 +22,31 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /opt/volumes/apps/endlessly/storage:/data:ro
+    networks:
+      - traefik-public
+      - backend
+    depends_on:
+      app:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.endlessly.rule=Host(`endlessly.phnx-solution.com`)"
+      - "traefik.http.routers.endlessly.entrypoints=websecure"
+      - "traefik.http.routers.endlessly.tls=true"
+      - "traefik.http.services.endlessly.loadbalancer.server.port=80"
+      - "traefik.http.services.endlessly.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.endlessly.loadbalancer.healthcheck.interval=15s"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
 networks:
   traefik-public:
