@@ -95,13 +95,25 @@ SESSION_DRIVER=redis
 cd /opt/infrastructure && docker compose up -d
 
 # Start an app
-docker compose -f /opt/infrastructure/apps/<name>/docker-compose.yml up -d
+cd /opt/infrastructure/apps/<name> && docker compose up -d
 
 # View logs
 docker compose logs -f <service>
 
 # Run backup manually
 /opt/infrastructure/backups/backup.sh
+
+# Verify OS hardening
+bash /opt/infrastructure/scripts/verify-setup.sh
+
+# Migration: pack data on old VPS
+bash /opt/infrastructure/scripts/migrate-pack.sh [--dry-run]
+
+# Migration: restore data on new VPS
+bash /opt/infrastructure/scripts/migrate-unpack.sh /path/to/tarball [--verify-only]
+
+# Verify migration
+bash /opt/infrastructure/scripts/verify-migration.sh
 ```
 
 ## Debugging / Logs

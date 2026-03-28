@@ -44,7 +44,11 @@ infrastructure/
 ├── mysql/
 │   └── my.cnf              # Tuned for 4GB VPS
 ├── scripts/
-│   └── setup.sh            # One-time VPS provisioning
+│   ├── setup.sh             # One-time VPS provisioning (hardened)
+│   ├── verify-setup.sh      # Verify OS-level hardening
+│   ├── migrate-pack.sh      # Pack data for VPS migration
+│   ├── migrate-unpack.sh    # Restore data on new VPS
+│   └── verify-migration.sh  # Verify migrated data and services
 ├── backups/
 │   ├── backup.sh            # Daily MySQL dumps (14-day retention)
 │   └── volume-backup.sh     # Weekly storage backups (30-day retention)
@@ -83,22 +87,30 @@ bash /opt/infrastructure/scripts/setup.sh
 ```
 
 This script:
-- Installs Docker, htop, ufw, fail2ban
-- Creates a `deploy` user with your SSH key (copies from root)
-- Configures firewall (only SSH + 80 + 443)
-- Creates the `/opt/` directory structure
+- Installs Docker, htop, ufw, fail2ban, unattended-upgrades
+- Creates `deploy` user with SSH key + sudo with password
+- Moves SSH to port **41922**, key-only auth, AllowUsers deploy
+- Configures UFW: SSH on 41922, HTTP/HTTPS restricted to Cloudflare IPs only
+- Configures fail2ban: SSH jail + recidive jail for repeat offenders
+- Applies kernel hardening (SYN flood, IP spoofing, ICMP protection)
+- Enables automatic security updates (no auto-reboot)
+- Creates the `/opt/` directory structure with correct permissions
 - Creates `traefik-public` and `backend` Docker networks
 - Sets up 2GB swap
-- Hardens SSH (disables password auth and root login)
+- Disables snapd, restricts cron access, secures shared memory
 - Configures cron for backups and Docker cleanup
 
-**After it finishes, log out and log back in as the deploy user:**
+**After it finishes, verify and log in as deploy:**
 
 ```bash
-ssh deploy@your-vps-ip
+# Verify hardening
+bash /opt/infrastructure/scripts/verify-setup.sh
+
+# Log in on the new SSH port
+ssh -p 41922 deploy@your-vps-ip
 ```
 
-> **Warning:** The script disables root login and password authentication.
+> **Warning:** SSH moves to port 41922 and root login is disabled.
 > Make sure your SSH key works for the `deploy` user before disconnecting.
 
 ### Step 2: Create the .env file
@@ -222,7 +234,7 @@ Add these secrets to your GitHub repo (or at the org level to share across repos
 | `VPS_HOST` | Your VPS IP address |
 | `VPS_USER` | `deploy` |
 | `VPS_SSH_KEY` | Contents of the deploy user's private SSH key |
-| `VPS_PORT` | `22` (or your custom SSH port) |
+| `VPS_PORT` | `41922` |
 | `GHCR_PAT` | GitHub Personal Access Token with `read:packages` scope |
 
 **Generate the GHCR PAT:**
@@ -335,6 +347,80 @@ If you're moving an app from bare-metal to Docker on the same VPS:
 5. **Update DNS** in Cloudflare to route through Traefik.
 
 6. **Decommission** the old bare-metal setup once verified.
+
+---
+
+## VPS-to-VPS Migration
+
+Migrate all data, secrets, and volumes from one VPS to another. The new VPS must have `setup.sh` already run and this repo cloned.
+
+### What gets migrated
+
+- `.env` files (infrastructure + all apps)
+- TLS certificates (Cloudflare Origin Certificate)
+- MySQL databases (per-database dumps)
+- Redis data (AOF + RDB)
+- Uptime Kuma data (monitors, alerts, history)
+- App volumes (uploads, storage, logs)
+- App config files (nginx.conf, etc.)
+
+### Step 1: Pack on the old VPS
+
+```bash
+# Preview what will be packed
+bash /opt/infrastructure/scripts/migrate-pack.sh --dry-run
+
+# Create the migration tarball (apps stop briefly for consistent snapshot)
+bash /opt/infrastructure/scripts/migrate-pack.sh
+```
+
+Output: `/opt/migration-pack-YYYY-MM-DD.tar.gz`
+
+### Step 2: Transfer to the new VPS
+
+```bash
+scp -P 41922 /opt/migration-pack-*.tar.gz deploy@new-vps-ip:/opt/
+```
+
+### Step 3: Provision the new VPS
+
+```bash
+# On the new VPS as root:
+git clone git@github.com:phnxco-solution/infrastructure.git /opt/infrastructure
+bash /opt/infrastructure/scripts/setup.sh
+```
+
+### Step 4: Unpack on the new VPS
+
+```bash
+# Preview and validate the tarball
+bash /opt/infrastructure/scripts/migrate-unpack.sh /opt/migration-pack-*.tar.gz --verify-only
+
+# Restore everything
+bash /opt/infrastructure/scripts/migrate-unpack.sh /opt/migration-pack-*.tar.gz
+```
+
+This restores all data, starts infrastructure and apps, and creates MySQL users.
+
+### Step 5: Verify
+
+```bash
+# OS-level hardening checks
+bash /opt/infrastructure/scripts/verify-setup.sh
+
+# Data and service checks
+bash /opt/infrastructure/scripts/verify-migration.sh
+```
+
+### Step 6: Cut over
+
+1. Update **Cloudflare DNS** A records to the new VPS IP
+2. Update **GitHub Actions secrets** in each app repo:
+   - `VPS_HOST` → new IP
+   - `VPS_PORT` → `41922`
+   - `VPS_SSH_KEY` → new deploy user's key
+3. Delete the tarball from both VPS instances (contains secrets)
+4. Monitor logs for 24 hours before decommissioning the old VPS
 
 ---
 
