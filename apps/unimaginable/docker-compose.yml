@@ -1,0 +1,130 @@
+name: unimaginable
+
+services:
+  app:
+    image: ghcr.io/phnxco-solution/unimaginable:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      CONTAINER_ROLE: app
+    volumes:
+      - /opt/volumes/apps/unimaginable/storage:/var/www/html/storage
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    healthcheck:
+      test: ["CMD-SHELL", "SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  nginx:
+    image: ghcr.io/phnxco-solution/unimaginable-nginx:latest
+    restart: unless-stopped
+    volumes:
+      - /opt/volumes/apps/unimaginable/storage/app/public:/var/www/html/public/storage:ro
+    networks:
+      - traefik-public
+      - backend
+    depends_on:
+      app:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.unimaginable.rule=Host(`api.unimaginable.phnx-solution.com`)"
+      - "traefik.http.routers.unimaginable.entrypoints=websecure"
+      - "traefik.http.routers.unimaginable.tls=true"
+      - "traefik.http.services.unimaginable.loadbalancer.server.port=80"
+      - "traefik.http.services.unimaginable.loadbalancer.healthcheck.path=/up"
+      - "traefik.http.services.unimaginable.loadbalancer.healthcheck.interval=15s"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  worker:
+    image: ghcr.io/phnxco-solution/unimaginable:latest
+    restart: unless-stopped
+    env_file: .env
+    command: php artisan queue:work redis --queue=default --max-jobs=1000 --max-time=3600 --tries=3 --backoff=15 --timeout=90 --memory=128
+    volumes:
+      - /opt/volumes/apps/unimaginable/storage:/var/www/html/storage
+    networks:
+      - backend
+    depends_on:
+      app:
+        condition: service_healthy
+    stop_signal: SIGTERM
+    stop_grace_period: 120s
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'artisan queue:work' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+
+  content-worker:
+    image: ghcr.io/phnxco-solution/unimaginable:latest
+    restart: unless-stopped
+    env_file: .env
+    # Long-running content generation: AI calls + ffmpeg. Memory raised via -d so PHP can
+    # buffer audio/image payloads; --timeout=1500 mirrors local dev's 1200s for content jobs.
+    command: php -d memory_limit=384M artisan queue:work redis --queue=content-generation,content-regeneration --max-jobs=200 --max-time=3600 --tries=3 --backoff=30 --timeout=1500 --memory=320
+    volumes:
+      - /opt/volumes/apps/unimaginable/storage:/var/www/html/storage
+    networks:
+      - backend
+    depends_on:
+      app:
+        condition: service_healthy
+    stop_signal: SIGTERM
+    stop_grace_period: 1530s
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'artisan queue:work' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 448M
+
+  scheduler:
+    image: ghcr.io/phnxco-solution/unimaginable:latest
+    restart: unless-stopped
+    env_file: .env
+    command: php artisan schedule:work
+    volumes:
+      - /opt/volumes/apps/unimaginable/storage:/var/www/html/storage
+    networks:
+      - backend
+    depends_on:
+      app:
+        condition: service_healthy
+    stop_signal: SIGTERM
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'artisan schedule:work' > /dev/null || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+networks:
+  traefik-public:
+    external: true
+  backend:
+    external: true
