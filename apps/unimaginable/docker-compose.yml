@@ -35,7 +35,7 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.unimaginable.rule=Host(`api.unimaginable.phnx-solution.com`)"
+      - "traefik.http.routers.unimaginable.rule=Host(`unimaginable-api.phnx-solution.com`)"
       - "traefik.http.routers.unimaginable.entrypoints=websecure"
       - "traefik.http.routers.unimaginable.tls=true"
       - "traefik.http.services.unimaginable.loadbalancer.server.port=80"
