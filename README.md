@@ -54,7 +54,8 @@ infrastructure/
 │   └── volume-backup.sh     # Weekly storage backups (30-day retention)
 └── templates/
     ├── laravel/             # Docker files for new Laravel apps
-    └── nuxt/                # Docker files for new Nuxt apps
+    ├── nuxt/                # Docker files for new Nuxt apps
+    └── spa/                 # Docker files for new Vite SPAs (Vue/React/Svelte)
 ```
 
 ---

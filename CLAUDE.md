@@ -66,13 +66,15 @@ Two Docker networks:
 | mega-catering | mega-catering.phnx-solution.com | Laravel 12 + Vue 3 |
 | phnx-solution | phnx-solution.com | Static HTML |
 | endlessly | endlessly.phnx-solution.com | Nuxt 3 SSR |
+| unimaginable | api.unimaginable.phnx-solution.com | Laravel 12 (API) |
+| unimaginable-app | unimaginable.phnx-solution.com | Vite SPA (Vue 3 PWA) |
 | uptime-kuma | status.phnx-solution.com | Uptime monitoring |
 
 Traefik dashboard: traefik.phnx-solution.com
 
 ## Adding a New App
 
-1. Run `init.sh` from the template (`templates/laravel/` or `templates/nuxt/`) — copies Docker files into the app repo and creates a production compose file in `apps/<name>/`
+1. Run `init.sh` from the template (`templates/laravel/`, `templates/nuxt/`, or `templates/spa/`) — copies Docker files into the app repo and creates a production compose file in `apps/<name>/`
 2. Customize as needed (remove unused PHP extensions, adjust memory limits, add scheduler)
 3. On VPS: `git pull` the infrastructure repo, add `.env` to `apps/<name>/`
 4. Traefik auto-discovers via labels — no other infrastructure changes needed
