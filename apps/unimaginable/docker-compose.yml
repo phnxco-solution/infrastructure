@@ -10,6 +10,7 @@ services:
     volumes:
       - /opt/volumes/apps/unimaginable/storage:/var/www/html/storage
     networks:
+      - default
       - backend
     deploy:
       resources:
@@ -28,8 +29,8 @@ services:
     volumes:
       - /opt/volumes/apps/unimaginable/storage/app/public:/var/www/html/public/storage:ro
     networks:
+      - default
       - traefik-public
-      - backend
     depends_on:
       app:
         condition: service_healthy
@@ -124,6 +125,7 @@ services:
           memory: 128M
 
 networks:
+  default:
   traefik-public:
     external: true
   backend:
