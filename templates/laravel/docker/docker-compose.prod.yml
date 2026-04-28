@@ -10,7 +10,10 @@ services:
     volumes:
       - /opt/volumes/apps/{{APP_NAME}}/storage:/var/www/html/storage
     networks:
-      - backend
+      default:
+        aliases:
+          - {{APP_NAME}}-fpm
+      backend:
     deploy:
       resources:
         limits:
@@ -28,8 +31,8 @@ services:
     volumes:
       - /opt/volumes/apps/{{APP_NAME}}/storage/app/public:/var/www/html/public/storage:ro
     networks:
+      - default
       - traefik-public
-      - backend
     depends_on:
       app:
         condition: service_healthy
@@ -97,6 +100,7 @@ services:
           memory: 128M
 
 networks:
+  default:
   traefik-public:
     external: true
   backend:

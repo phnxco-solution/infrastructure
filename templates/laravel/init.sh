@@ -22,6 +22,7 @@ mkdir -p .github/workflows
 cp "$TEMPLATE_DIR/.github/workflows/deploy.yml" .github/workflows/deploy.yml
 
 sed -i '' "s/{{APP_NAME}}/$APP_NAME/g" .github/workflows/deploy.yml
+sed -i '' "s/{{APP_NAME}}/$APP_NAME/g" docker/nginx.conf
 
 mkdir -p "$INFRA_ROOT/apps/$APP_NAME"
 sed -e "s/{{APP_NAME}}/$APP_NAME/g" -e "s/{{APP_DOMAIN}}/$APP_DOMAIN/g" "$TEMPLATE_DIR/docker/docker-compose.prod.yml" > "$INFRA_ROOT/apps/$APP_NAME/docker-compose.yml"
