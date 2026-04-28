@@ -10,8 +10,10 @@ services:
     volumes:
       - /opt/volumes/apps/unimaginable/storage:/var/www/html/storage
     networks:
-      - default
-      - backend
+      default:
+        aliases:
+          - unimaginable-fpm
+      backend:
     deploy:
       resources:
         limits:
