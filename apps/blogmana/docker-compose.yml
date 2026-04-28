@@ -1,7 +1,9 @@
 name: blogmana
 
 services:
-  app:
+  # Service is named 'web' (not 'app') so its DNS alias on traefik-public
+  # doesn't collide with other projects also using a service named 'app'.
+  web:
     image: ghcr.io/phnxco-solution/blogmana:latest
     restart: unless-stopped
     env_file: .env
