@@ -62,11 +62,16 @@ RUN printf '%s\n' \
 
 WORKDIR /var/www/html
 
-# ── Composer dependencies (only used by production) ──────────────────
+# ── Composer dependencies (used by production stage) ─────────────────
+# COMPOSER_NO_DEV controls whether dev deps (faker, ide-helper, pest, etc.)
+# end up in the deployed image. Defaults to --no-dev (production-correct).
+# Override at build time to install dev deps for staging/dev deploys:
+#   docker build --build-arg COMPOSER_NO_DEV= ...
 FROM composer:2 AS composer-deps
+ARG COMPOSER_NO_DEV=--no-dev
 WORKDIR /app
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --ignore-platform-reqs
+RUN composer install ${COMPOSER_NO_DEV} --no-scripts --no-autoloader --prefer-dist --ignore-platform-reqs
 COPY . .
 RUN composer dump-autoload --optimize
 

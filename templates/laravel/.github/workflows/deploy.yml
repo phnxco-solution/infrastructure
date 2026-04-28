@@ -41,6 +41,11 @@ jobs:
           tags: |
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.IMAGE_NAME }}:latest
+          # Uncomment for staging/dev deploys to install dev deps
+          # (faker, ide-helper, pest, etc.). Leave commented or remove
+          # for production — Dockerfile defaults to --no-dev.
+          # build-args: |
+          #   COMPOSER_NO_DEV=
           cache-from: type=gha,scope=app
           cache-to: type=gha,mode=max,scope=app
 

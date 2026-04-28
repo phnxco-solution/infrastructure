@@ -44,6 +44,21 @@ The template includes all services by default (vite, worker, scheduler). Remove 
 - **nginx.conf** — adjust `client_max_body_size` if your app handles larger uploads
 - **docker-compose.prod.yml** — adjust memory limits per service
 
+## Staging vs production deploys
+
+The Dockerfile defaults to `composer install --no-dev` (production-correct).
+For a staging/dev server where you want faker, ide-helper, pest, etc.
+available (e.g. for `db:seed --force`), uncomment the `build-args` block
+in `.github/workflows/deploy.yml`:
+
+```yaml
+build-args: |
+  COMPOSER_NO_DEV=
+```
+
+For a real production deploy, leave it commented or remove it and the
+`--no-dev` default takes effect.
+
 ## Architecture
 
 **Two images are built per app:**
