@@ -156,6 +156,14 @@ echo "=== Harden SSH ==="
 # Remove conflicting drop-ins (Hostinger/cloud-init may override our settings)
 rm -f /etc/ssh/sshd_config.d/50-cloud-init.conf
 
+# Ubuntu 22.10+ uses ssh.socket activation, which binds the listen port itself
+# and ignores the Port directive in sshd_config. Disable it so our Port setting
+# takes effect and sshd runs as a normal long-lived service.
+if systemctl list-unit-files ssh.socket &>/dev/null; then
+  systemctl disable --now ssh.socket 2>/dev/null || true
+fi
+systemctl enable ssh.service 2>/dev/null || true
+
 # Comment out Port in main config (Port is additive — both would listen)
 sed -i 's/^Port /#Port /' /etc/ssh/sshd_config
 
@@ -185,7 +193,7 @@ if ! sshd -t; then
   exit 1
 fi
 
-systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null
+systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null
 
 # Verify new port is listening
 sleep 1
@@ -203,7 +211,7 @@ else
   echo "FATAL: SSH not listening on port $SSH_PORT — reverting"
   ufw allow 22/tcp
   rm -f /etc/ssh/sshd_config.d/00-hardening.conf
-  systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null
+  systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null
   exit 1
 fi
 
