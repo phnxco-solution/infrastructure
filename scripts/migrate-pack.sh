@@ -348,8 +348,8 @@ HOSTNAME_VAL=$(hostname)
 # Build app .env presence map
 ENV_MAP=""
 for app in "${APPS[@]}"; do
-  HAS_ENV="false"
-  [ -f "$STAGING_DIR/migration/env/apps/${app}.env" ] && HAS_ENV="true"
+  HAS_ENV="False"
+  [ -f "$STAGING_DIR/migration/env/apps/${app}.env" ] && HAS_ENV="True"
   ENV_MAP="$ENV_MAP\"$app\": $HAS_ENV, "
 done
 
@@ -357,7 +357,7 @@ python3 -c "
 import json, datetime
 manifest = {
     'version': '1.0',
-    'created_at': datetime.datetime.utcnow().isoformat() + 'Z',
+    'created_at': datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat() + 'Z',
     'source_hostname': '$HOSTNAME_VAL',
     'infrastructure_git_commit': '$GIT_COMMIT',
     'components': {
@@ -377,7 +377,7 @@ manifest = {
 }
 with open('$STAGING_DIR/migration/manifest.json', 'w') as f:
     json.dump(manifest, f, indent=2)
-" 2>/dev/null
+"
 
 success "Manifest generated"
 
