@@ -1,0 +1,13 @@
+[Unit]
+Description=Restrict Docker-published 80/443 to Cloudflare source IPs
+# Must run after Docker has created the DOCKER-USER chain
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/infrastructure/scripts/firewall-docker.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

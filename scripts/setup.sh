@@ -41,7 +41,7 @@ CF_IPV4=(
 
 echo "=== System update ==="
 apt update && apt upgrade -y
-apt install -y curl git htop ufw fail2ban apache2-utils unattended-upgrades apt-listchanges
+apt install -y curl git htop ufw fail2ban apache2-utils unattended-upgrades apt-listchanges ipset
 
 # =============================================================================
 # 2. User provisioning
@@ -310,6 +310,21 @@ chmod 700 /opt/volumes
 echo "=== Create Docker networks ==="
 docker network create traefik-public 2>/dev/null || echo "traefik-public network already exists"
 docker network create backend 2>/dev/null || echo "backend network already exists"
+
+# =============================================================================
+# 9b. Docker firewall — Cloudflare-only for published 80/443 (Docker bypasses UFW)
+# =============================================================================
+
+echo "=== Restrict Docker-published 80/443 to Cloudflare ==="
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/docker-cloudflare-firewall.service" ]; then
+  cp "$SCRIPT_DIR/docker-cloudflare-firewall.service" /etc/systemd/system/
+  systemctl daemon-reload
+  systemctl enable --now docker-cloudflare-firewall.service
+  echo "docker-cloudflare-firewall.service enabled"
+else
+  echo "WARNING: docker-cloudflare-firewall.service not found — skipping"
+fi
 
 # =============================================================================
 # 10. Swap
