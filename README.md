@@ -27,6 +27,8 @@ Internet → Cloudflare (DNS + SSL) → VPS:443 → Traefik
 
 **SSL:** Cloudflare handles public SSL. Traefik uses a Cloudflare Origin Certificate for the Cloudflare→VPS connection. No Let's Encrypt needed.
 
+**Network security:** Only Cloudflare may reach ports 80/443. This is enforced in **two** places because **Docker's iptables rules bypass UFW**: UFW restricts the host, and `scripts/firewall-docker.sh` adds a `DOCKER-USER` rule (Cloudflare ranges in an ipset) so container-published ports are Cloudflare-only too. A systemd unit re-applies it on every boot. See [Critical Gotchas](#critical-gotchas).
+
 ## Repository Structure
 
 ```
@@ -46,6 +48,8 @@ infrastructure/
 ├── scripts/
 │   ├── setup.sh             # One-time VPS provisioning (hardened)
 │   ├── verify-setup.sh      # Verify OS-level hardening
+│   ├── firewall-docker.sh   # Restrict Docker-published 80/443 to Cloudflare IPs (Docker bypasses UFW)
+│   ├── docker-cloudflare-firewall.service  # systemd unit — re-applies the above on every boot
 │   ├── migrate-pack.sh      # Pack data for VPS migration
 │   ├── migrate-unpack.sh    # Restore data on new VPS
 │   └── verify-migration.sh  # Verify migrated data and services
@@ -60,13 +64,40 @@ infrastructure/
 
 ---
 
+## Critical Gotchas
+
+Hard-won notes from real provisioning + migration. Read these first — each one cost real debugging time.
+
+1. **Ubuntu 22.10+ uses SSH socket activation.** `ssh.socket` owns the listen port and *ignores* the `Port` directive in `sshd_config`. `setup.sh` disables `ssh.socket`, enables `ssh.service`, and `restart`s (not `reload`) so port **41922** actually binds. If you hand-edit SSH, remember this or sshd stays on 22.
+
+2. **Your SSH key must be in _root's_ `authorized_keys` before running `setup.sh`.** The script copies it from root to `deploy`, and `set -euo pipefail` makes it abort if root has no key. Most providers add it for you when you select an SSH key at VPS creation — verify with `cat /root/.ssh/authorized_keys`.
+
+3. **Reboot after `setup.sh`.** It pulls a new kernel, and the old socket-activated `sshd` can linger on port 22 until reboot. **Before** rebooting or closing the root session, confirm `ssh -p 41922 deploy@<ip>` then `sudo whoami` works in a *second* terminal.
+
+4. **The provider-level firewall is separate from UFW.** If your host panel (e.g. Hostinger) has its own firewall, allow **41922, 80, 443** there too — or you lock yourself out / block all web traffic.
+
+5. **Docker bypasses UFW.** Docker writes its own iptables rules, so UFW's "Cloudflare-only" rule does **not** protect container-published ports — without the fix, the origin answers anyone on 80/443. `firewall-docker.sh` (run by `docker-cloudflare-firewall.service` on boot) closes this via the `DOCKER-USER` chain + a Cloudflare ipset. Verify from off-Cloudflare: `curl -I http://<vps-ip>/` should **time out**.
+
+6. **Only `deploy` can SSH** (`AllowUsers deploy`) — other users are rejected even with a valid key. To allow another, edit `AllowUsers` in `setup.sh` (not just on the box, or a re-run overwrites it).
+
+7. **Own the repo as `deploy`; never the volumes.** If you clone/pull/edit `/opt/infrastructure` as root, fix it: `sudo chown -R deploy:deploy /opt/infrastructure`. **Never** `chown -R /opt/volumes` — MySQL/Redis data is owned by container UIDs (`999`) and they refuse data dirs they don't own.
+
+8. **Log into GHCR on the VPS as `deploy`** before pulling app images (see [GHCR login](#log-into-ghcr-on-the-vps)). Without it, `docker compose pull` fails with `unauthorized` and apps never start.
+
+9. **Don't repoint DNS until the apps are actually running on the target box.** With the Cloudflare-only firewall + Traefik, an unknown host just returns 404 — if DNS points at a VPS where the app container isn't up yet, that site is down.
+
+> `cron.allow` is `644` (not `600`) so the setgid `crontab` binary can read it; otherwise `deploy` gets "not allowed to use this program." `setup.sh` already handles this.
+
+---
+
 ## Deploy to VPS
 
 ### Prerequisites
 
-- A VPS with Ubuntu 22.04+ (tested on Hostinger 4GB/2CPU)
-- Root SSH access to the VPS
-- A Cloudflare account managing your domain(s)
+- A VPS with Ubuntu 22.04+ (tested on **Ubuntu 24.04**, Hostinger 4GB/2CPU)
+- Root SSH access to the VPS, **with your public key already in `/root/.ssh/authorized_keys`** (see [Gotcha #2](#critical-gotchas))
+- A Cloudflare account managing your domain(s), set to **Full (strict)** SSL
+- A provider-level firewall (if any) allowing **41922, 80, 443** (see [Gotcha #4](#critical-gotchas))
 - This repo pushed to GitHub
 
 ### Step 1: Clone the repo and provision the VPS
@@ -88,31 +119,43 @@ bash /opt/infrastructure/scripts/setup.sh
 ```
 
 This script:
-- Installs Docker, htop, ufw, fail2ban, unattended-upgrades
+- Installs Docker, htop, ufw, fail2ban, unattended-upgrades, ipset
 - Creates `deploy` user with SSH key + sudo with password
-- Moves SSH to port **41922**, key-only auth, AllowUsers deploy
+- Disables `ssh.socket` activation (Ubuntu 22.10+) and moves SSH to port **41922**, key-only auth, AllowUsers deploy
 - Configures UFW: SSH on 41922, HTTP/HTTPS restricted to Cloudflare IPs only
+- Restricts Docker-published 80/443 to Cloudflare IPs (`DOCKER-USER` chain) — Docker bypasses UFW — and installs a systemd unit to persist it across reboots
 - Configures fail2ban: SSH jail + recidive jail for repeat offenders
 - Applies kernel hardening (SYN flood, IP spoofing, ICMP protection)
 - Enables automatic security updates (no auto-reboot)
 - Creates the `/opt/` directory structure with correct permissions
 - Creates `traefik-public` and `backend` Docker networks
 - Sets up 2GB swap
-- Disables snapd, restricts cron access, secures shared memory
+- Disables snapd, restricts cron access (`cron.allow` 644), secures shared memory
 - Configures cron for backups and Docker cleanup
 
-**After it finishes, verify and log in as deploy:**
+**After it finishes — confirm access, then reboot:**
 
 ```bash
+# In a SECOND terminal (keep the root session open), confirm the new path works:
+ssh -p 41922 deploy@your-vps-ip
+sudo whoami        # prompts for the deploy password → prints "root"
+
 # Verify hardening
 bash /opt/infrastructure/scripts/verify-setup.sh
 
-# Log in on the new SSH port
-ssh -p 41922 deploy@your-vps-ip
+# If you ran any setup steps as root (git clone/pull, editing files), give the
+# repo back to deploy — but NEVER chown /opt/volumes (see Gotcha #7):
+sudo chown -R deploy:deploy /opt/infrastructure
+
+# Reboot to load the pending kernel and clear any stale sshd still on port 22
+sudo reboot
 ```
 
-> **Warning:** SSH moves to port 41922 and root login is disabled.
-> Make sure your SSH key works for the `deploy` user before disconnecting.
+After it comes back, re-run `verify-setup.sh` — it should be all-clear.
+
+> **Warning:** SSH moves to port 41922 and root login is disabled. **Confirm the
+> `deploy` login on 41922 in a separate terminal before disconnecting or rebooting.**
+> If the provider has its own firewall, it must allow 41922 (see [Gotcha #4](#critical-gotchas)).
 
 ### Step 2: Create the .env file
 
@@ -177,7 +220,7 @@ Verify everything is running:
 docker ps
 ```
 
-You should see 3 containers: `traefik`, `mysql`, `redis` — all with status `healthy`.
+You should see 5 containers: `traefik`, `mysql`, `redis`, `uptime-kuma`, `autoheal` — all with status `healthy`.
 
 **Test the Traefik dashboard:**
 
@@ -246,7 +289,7 @@ Add these secrets to your GitHub repo (or at the org level to share across repos
 ### 3. Set up on the VPS
 
 ```bash
-# Pull the infrastructure repo to get the new compose file
+# Pull the infrastructure repo to get the new compose file (as deploy)
 cd /opt/infrastructure && git pull
 
 # Create storage directory
@@ -255,6 +298,18 @@ mkdir -p /opt/volumes/apps/<app-name>/storage/{app/public,framework/{cache/data,
 # Create the production .env next to the compose file
 nano /opt/infrastructure/apps/<app-name>/.env
 ```
+
+#### Log into GHCR on the VPS
+
+App images are private (`ghcr.io/phnxco-solution/*`), so the VPS must authenticate before it can pull them. **One-time per VPS, run as `deploy`** (the user that runs `docker compose`, so the credentials land in its `~/.docker/config.json`):
+
+```bash
+# Create a classic PAT with read:packages scope (authorize SSO for the org if enabled), then:
+echo 'ghp_yourtoken' | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+docker pull ghcr.io/phnxco-solution/<app-name>:latest   # confirm it works
+```
+
+> Without this, `docker compose pull` (step 6, and `migrate-unpack.sh`) fails with `unauthorized` and the app never starts.
 
 **Key .env changes for Docker:**
 
@@ -386,10 +441,22 @@ scp -P 41922 /opt/migration-pack-*.tar.gz deploy@new-vps-ip:/opt/
 ### Step 3: Provision the new VPS
 
 ```bash
-# On the new VPS as root:
+# On the new VPS as root (your key must already be in /root/.ssh/authorized_keys):
 git clone git@github.com:phnxco-solution/infrastructure.git /opt/infrastructure
 bash /opt/infrastructure/scripts/setup.sh
+
+# Confirm 41922 login in a second terminal (see Gotcha #2/#3), then:
+sudo chown -R deploy:deploy /opt/infrastructure   # repo was cloned as root
+sudo reboot                                        # load kernel, clear stale sshd on 22
 ```
+
+Then **as `deploy`**, log into GHCR so the apps can pull their images during unpack (see [GHCR login](#log-into-ghcr-on-the-vps)):
+
+```bash
+echo 'ghp_yourtoken' | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+```
+
+> The new VPS also needs the infrastructure `.env`, the TLS cert, and `docker compose up -d` for the base stack **only if** you're not relying on the tarball to provide them — `migrate-unpack.sh` restores the infra `.env`, certs, and starts everything, so on a clean migration you can go straight to unpack after the GHCR login.
 
 ### Step 4: Unpack on the new VPS
 
@@ -414,6 +481,8 @@ bash /opt/infrastructure/scripts/verify-migration.sh
 ```
 
 ### Step 6: Cut over
+
+> **Only cut over once Step 5 confirms the apps are up and healthy on the new VPS.** Until DNS points at the new box, the apps there are unreachable from the internet (Cloudflare-only firewall), so verify locally first — e.g. `curl -H 'Host: mega-catering.phnx-solution.com' -k https://127.0.0.1/health` on the new VPS. If you repoint DNS while an app container is down, that site returns 404 (see [Gotcha #9](#critical-gotchas)).
 
 1. Update **Cloudflare DNS** A records to the new VPS IP
 2. Update **GitHub Actions secrets** in each app repo:

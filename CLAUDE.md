@@ -30,6 +30,19 @@ Two Docker networks:
 - `traefik-public` — Traefik routes to app nginx containers
 - `backend` — apps talk to MySQL and Redis
 
+**Firewall:** 80/443 are Cloudflare-only, enforced in two layers — UFW (host) **and** a `DOCKER-USER` rule with a Cloudflare ipset (`scripts/firewall-docker.sh`, persisted by `docker-cloudflare-firewall.service`) because **Docker bypasses UFW**. SSH is on **41922**, key-only, `AllowUsers deploy`.
+
+## Gotchas (provisioning / migration)
+
+- **Ubuntu 22.10+ SSH socket activation**: `ssh.socket` owns the listen port and ignores `sshd_config`'s `Port`. `setup.sh` disables it, enables `ssh.service`, and restarts. **Reboot after `setup.sh`** (new kernel + a stale sshd can linger on 22). Confirm `ssh -p 41922 deploy@ip` in a second terminal before closing root.
+- **Root needs `authorized_keys`** before `setup.sh` — it copies root→deploy and `set -e` aborts if root has no key.
+- **Docker bypasses UFW**: container-published 80/443 aren't protected by UFW alone. `firewall-docker.sh` (DOCKER-USER + Cloudflare ipset, run on boot by the systemd unit) enforces Cloudflare-only. Verify off-CF: `curl -I http://<ip>/` must time out.
+- **GHCR login required on the VPS** (as `deploy`) before pulling private app images, else `compose pull` → `unauthorized`.
+- **Ownership**: `chown -R deploy:deploy /opt/infrastructure` if anything was touched as root. **Never** chown `/opt/volumes` — container UIDs (`999`) own their data dirs and refuse otherwise.
+- **DNS last**: don't repoint a host until its app container is up on the target VPS, or Traefik returns 404.
+- `cron.allow` is `644` (setgid `crontab` must read it); only `deploy` may SSH (`AllowUsers deploy`).
+- Provider-panel firewall (Hostinger) is separate from UFW — must allow 41922/80/443.
+
 ## VPS Directory Structure
 
 ```
@@ -99,6 +112,16 @@ cd /opt/infrastructure && docker compose up -d
 # Start an app
 cd /opt/infrastructure/apps/<name> && docker compose up -d
 
+# Log into GHCR (once per VPS, as deploy) — needed to pull private app images
+echo '<ghcr-pat>' | docker login ghcr.io -u <github-user> --password-stdin
+
+# Re-apply / inspect the Docker→Cloudflare firewall
+sudo systemctl restart docker-cloudflare-firewall.service
+sudo iptables -S DOCKER-USER
+
+# Fix repo ownership after root operations (NEVER chown /opt/volumes)
+sudo chown -R deploy:deploy /opt/infrastructure
+
 # View logs
 docker compose logs -f <service>
 
@@ -135,6 +158,8 @@ When something breaks, here's where to look:
 | | Slow query log | `docker exec mysql cat /var/lib/mysql/slow.log` |
 | **Redis** | Docker logs | `docker logs redis --tail 100` |
 | **Container restarts** | Autoheal + Docker events | `docker events --filter event=restart --since 1h` |
+| **Site 404 / down** | App container not up, GHCR not logged in, or DNS not proxied | `cd /opt/infrastructure/apps/<name> && docker compose ps`; `docker login ghcr.io` |
+| **Origin reachable off-Cloudflare** | DOCKER-USER firewall not applied | `sudo systemctl status docker-cloudflare-firewall; sudo iptables -S DOCKER-USER` |
 
 **Log retention:**
 - Docker json-file logs: 3 x 10MB (daemon config), lost on container recreation
