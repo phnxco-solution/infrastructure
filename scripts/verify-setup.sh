@@ -118,8 +118,8 @@ echo "=== Firewall (UFW) ==="
 check "ufw status | grep -q 'Status: active'" "UFW is active"
 check "ufw status | grep -q '$SSH_PORT/tcp'" "SSH port $SSH_PORT allowed"
 
-# Port 22 should NOT be in UFW
-if ufw status | grep -qE '22/tcp|OpenSSH'; then
+# Port 22 should NOT be in UFW (anchor to line start so 41922/tcp and .0/22 CIDRs don't match)
+if ufw status | grep -qE '^22(/tcp)?[[:space:]]|^OpenSSH'; then
   fail "Port 22 still allowed in UFW"
 else
   pass "Port 22 removed from UFW"
@@ -209,7 +209,7 @@ check "docker info &>/dev/null" "Docker is accessible"
 check "test -f /etc/docker/daemon.json" "Docker daemon.json exists"
 
 # Logging config
-if docker info 2>/dev/null | grep -q 'json-file'; then
+if [ "$(docker info --format '{{.LoggingDriver}}' 2>/dev/null)" = "json-file" ]; then
   pass "Docker log driver: json-file"
 else
   warn "Docker log driver is not json-file"
@@ -304,11 +304,14 @@ echo "=== Cron Jobs ==="
 CRONTAB=$(crontab -u $DEPLOY_USER -l 2>/dev/null || true)
 if [ -n "$CRONTAB" ]; then
   pass "Crontab configured for $DEPLOY_USER"
-  check "echo '$CRONTAB' | grep -q 'backup.sh'" "MySQL backup cron present"
-  check "echo '$CRONTAB' | grep -q 'volume-backup.sh'" "Volume backup cron present"
-  check "echo '$CRONTAB' | grep -q 'docker image prune'" "Docker cleanup cron present"
-  check "echo '$CRONTAB' | grep -q 'slow.log'" "MySQL slow log rotation present"
-  check "echo '$CRONTAB' | grep -q 'app-.*\\.log'" "App log cleanup cron present"
+  # Match against a here-string (not echo|eval) — a cron line contains a single
+  # quote that breaks eval-based grepping
+  cron_has() { if grep -qE "$1" <<<"$CRONTAB"; then pass "$2"; else fail "$2"; fi; }
+  cron_has 'backup\.sh' "MySQL backup cron present"
+  cron_has 'volume-backup\.sh' "Volume backup cron present"
+  cron_has 'docker image prune' "Docker cleanup cron present"
+  cron_has 'slow\.log' "MySQL slow log rotation present"
+  cron_has 'app-.*\.log' "App log cleanup cron present"
 else
   fail "No crontab for $DEPLOY_USER"
 fi

@@ -362,7 +362,9 @@ echo "=== Service hardening ==="
 
 # Restrict cron access
 echo -e "root\n$DEPLOY_USER" > /etc/cron.allow
-chmod 600 /etc/cron.allow
+# 644 (not 600): the setgid-crontab binary must read this to allow non-root
+# users; 600 makes it unreadable and crontab fails closed for $DEPLOY_USER
+chmod 644 /etc/cron.allow
 echo "Cron restricted to root and $DEPLOY_USER"
 
 # Disable snapd (wastes RAM on a Docker server)
