@@ -88,6 +88,8 @@ Hard-won notes from real provisioning + migration. Read these first — each one
 
 > `cron.allow` is `644` (not `600`) so the setgid `crontab` binary can read it; otherwise `deploy` gets "not allowed to use this program." `setup.sh` already handles this.
 
+10. **DB GUI tunnels need `AllowTcpForwarding local`.** To reach the dockerized MySQL from TablePlus/DBeaver, the tool opens an SSH tunnel (`ssh -L` to `127.0.0.1:3306`). The SSH hardening allows this via `AllowTcpForwarding local` — if it were `no`, the tool logs in but the tunnel is refused with **"Failed to create tunnel."** Tunnel user is **`deploy`**; use a **MySQL** connection type (8.4 uses `caching_sha2_password`, which the MariaDB driver can't auth), SSL **DISABLED** (the tunnel already encrypts). MySQL is published only on `127.0.0.1:3306`, so it's reachable solely through the SSH tunnel.
+
 ---
 
 ## Deploy to VPS

@@ -41,6 +41,7 @@ Two Docker networks:
 - **Ownership**: `chown -R deploy:deploy /opt/infrastructure` if anything was touched as root. **Never** chown `/opt/volumes` — container UIDs (`999`) own their data dirs and refuse otherwise.
 - **DNS last**: don't repoint a host until its app container is up on the target VPS, or Traefik returns 404.
 - `cron.allow` is `644` (setgid `crontab` must read it); only `deploy` may SSH (`AllowUsers deploy`).
+- **DB GUI over SSH** (TablePlus → dockerized MySQL `127.0.0.1:3306`): the SSH hardening sets `AllowTcpForwarding local` — if it's ever `no`, the GUI logs in but the tunnel is refused ("Failed to create tunnel"). The tunnel user is `deploy`; connection type must be **MySQL** (8.4 uses `caching_sha2_password`), not MariaDB.
 - Provider-panel firewall (Hostinger) is separate from UFW — must allow 41922/80/443.
 
 ## VPS Directory Structure

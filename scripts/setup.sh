@@ -181,7 +181,10 @@ ClientAliveInterval 300
 ClientAliveCountMax 2
 X11Forwarding no
 AllowAgentForwarding no
-AllowTcpForwarding no
+# 'local' (not 'no') so DB GUIs (TablePlus, etc.) can tunnel ssh -L to
+# 127.0.0.1:3306; still blocks remote (-R) forwards. Only key-gated deploy
+# can SSH, so this is low risk.
+AllowTcpForwarding local
 PermitEmptyPasswords no
 Banner /etc/issue.net
 EOF
