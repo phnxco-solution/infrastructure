@@ -209,6 +209,29 @@ chmod 600 traefik/certs/origin-key.pem
 
 > **Cloudflare SSL/TLS mode** must be set to **Full (strict)** for Origin Certificates to work.
 
+#### Adding a second domain (separate Cloudflare zone)
+
+The default cert above only covers `phnx-solution.com`. A different apex domain (its own Cloudflare zone) needs its **own** Origin Certificate, served by Traefik via SNI — otherwise you get **`526`** (origin cert fails strict validation).
+
+1. On the new zone: DNS A records → VPS IP (**Proxied**), SSL/TLS → **Full (strict)**.
+2. Create an Origin Certificate covering **both** `newdomain.com` **and** `*.newdomain.com` (a wildcard alone does **not** cover the apex).
+3. Save to `traefik/certs/newdomain.pem` + `newdomain-key.pem` (`chmod 600` the key).
+4. Add it to `traefik/dynamic/tls.yml` under `certificates:` — a **sibling of `stores:`**, both under `tls:`:
+   ```yaml
+   tls:
+     stores:
+       default:
+         defaultCertificate:
+           certFile: /etc/traefik/certs/origin.pem
+           keyFile: /etc/traefik/certs/origin-key.pem
+     certificates:
+       - certFile: /etc/traefik/certs/newdomain.pem
+         keyFile: /etc/traefik/certs/newdomain-key.pem
+   ```
+   Wrong indentation → `field not found, node: [0]` in the logs and Traefik drops the **whole** file (default cert included) → 526 for everything. `docker logs traefik | grep -i error` should be clean after `docker restart traefik`.
+
+> A valid cert with no app yet returns **404** (not 526) — that's expected until an app's compose adds a `Host(\`newdomain.com\`)` router.
+
 ### Step 4: Start the infrastructure
 
 ```bash
