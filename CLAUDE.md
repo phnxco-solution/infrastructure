@@ -78,7 +78,7 @@ Two Docker networks:
 | App | Domain | Type |
 |-----|--------|------|
 | mega-catering | mega-catering.phnx-solution.com | Laravel 12 + Vue 3 |
-| phnx-solution | phnx-solution.com | Static HTML |
+| phnx-solution | phnx-solution.com | Nuxt 4 SSR (coming-soon page) |
 | endlessly | endlessly.phnx-solution.com | Nuxt 3 SSR |
 | unimaginable | api.unimaginable.phnx-solution.com | Laravel 12 (API) |
 | unimaginable-app | unimaginable.phnx-solution.com | Vite SPA (Vue 3 PWA) |

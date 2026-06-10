@@ -1,11 +1,18 @@
 name: phnx-solution
 
 services:
-  nginx:
-    image: nginx:1.27-alpine
+  # Service is named 'web' (not 'app') so its DNS alias on traefik-public
+  # doesn't collide with other projects also using a service named 'app'.
+  web:
+    image: ghcr.io/phnxco-solution/phnx-solution:latest
     restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      # Persist signups on the mounted storage volume so they survive redeploys
+      SUBSCRIBERS_FILE: /app/storage/subscribers.ndjson
     volumes:
-      - /opt/volumes/apps/phnx-solution/public:/usr/share/nginx/html:ro
+      - /opt/volumes/apps/phnx-solution/storage:/app/storage
+      - /opt/volumes/apps/phnx-solution/logs:/app/logs
     networks:
       - traefik-public
     labels:
@@ -13,18 +20,19 @@ services:
       - "traefik.http.routers.phnx-solution.rule=Host(`phnx-solution.com`)"
       - "traefik.http.routers.phnx-solution.entrypoints=websecure"
       - "traefik.http.routers.phnx-solution.tls=true"
-      - "traefik.http.services.phnx-solution.loadbalancer.server.port=80"
+      - "traefik.http.services.phnx-solution.loadbalancer.server.port=3000"
       - "traefik.http.services.phnx-solution.loadbalancer.healthcheck.path=/"
       - "traefik.http.services.phnx-solution.loadbalancer.healthcheck.interval=15s"
     deploy:
       resources:
         limits:
-          memory: 64M
+          memory: 256M
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
-      interval: 30s
-      timeout: 5s
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/ || exit 1"]
+      interval: 5s
+      timeout: 3s
       retries: 3
+      start_period: 10s
 
 networks:
   traefik-public:
