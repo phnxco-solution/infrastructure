@@ -38,7 +38,8 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.mega-catering.rule=Host(`mega-catering.phnx-solution.com`)"
+      # Old phnx-solution host kept during cutover — drop it once app.megacatering.rs is verified
+      - "traefik.http.routers.mega-catering.rule=Host(`app.megacatering.rs`) || Host(`mega-catering.phnx-solution.com`)"
       - "traefik.http.routers.mega-catering.entrypoints=websecure"
       - "traefik.http.routers.mega-catering.tls=true"
       - "traefik.http.services.mega-catering.loadbalancer.server.port=80"

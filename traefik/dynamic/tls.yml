@@ -5,3 +5,7 @@ tls:
       defaultCertificate:
         certFile: /etc/traefik/certs/origin.pem
         keyFile: /etc/traefik/certs/origin-key.pem
+  certificates:
+    # megacatering.rs — separate Cloudflare zone, own origin cert served via SNI
+    - certFile: /etc/traefik/certs/megacatering.pem
+      keyFile: /etc/traefik/certs/megacatering-key.pem
