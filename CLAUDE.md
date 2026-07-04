@@ -77,7 +77,7 @@ Two Docker networks:
 
 | App | Domain | Type |
 |-----|--------|------|
-| mega-catering | app.megacatering.rs (separate CF zone; old mega-catering.phnx-solution.com alive until cutover done) | Laravel 12 + Vue 3 |
+| mega-catering | app.megacatering.rs (separate CF zone) | Laravel 12 + Vue 3 |
 | phnx-solution | phnx-solution.com | Nuxt 4 SSR (coming-soon page) |
 | endlessly | endlessly.phnx-solution.com | Nuxt 3 SSR |
 | unimaginable | api.unimaginable.phnx-solution.com | Laravel 12 (API) |

@@ -507,7 +507,7 @@ bash /opt/infrastructure/scripts/verify-migration.sh
 
 ### Step 6: Cut over
 
-> **Only cut over once Step 5 confirms the apps are up and healthy on the new VPS.** Until DNS points at the new box, the apps there are unreachable from the internet (Cloudflare-only firewall), so verify locally first — e.g. `curl -H 'Host: mega-catering.phnx-solution.com' -k https://127.0.0.1/health` on the new VPS. If you repoint DNS while an app container is down, that site returns 404 (see [Gotcha #9](#critical-gotchas)).
+> **Only cut over once Step 5 confirms the apps are up and healthy on the new VPS.** Until DNS points at the new box, the apps there are unreachable from the internet (Cloudflare-only firewall), so verify locally first — e.g. `curl -H 'Host: app.megacatering.rs' -k https://127.0.0.1/health` on the new VPS. If you repoint DNS while an app container is down, that site returns 404 (see [Gotcha #9](#critical-gotchas)).
 
 1. Update **Cloudflare DNS** A records to the new VPS IP
 2. Update **GitHub Actions secrets** in each app repo:
