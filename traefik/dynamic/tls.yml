@@ -9,3 +9,7 @@ tls:
     # megacatering.rs — separate Cloudflare zone, own origin cert served via SNI
     - certFile: /etc/traefik/certs/megacatering.pem
       keyFile: /etc/traefik/certs/megacatering-key.pem
+    - certFile: /etc/traefik/certs/unimaginableapp.pem
+      keyFile: /etc/traefik/certs/unimaginableapp-key.pem
+    - certFile: /etc/traefik/certs/unimaginable.pem
+      keyFile: /etc/traefik/certs/unimaginable-key.pem
