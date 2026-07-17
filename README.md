@@ -279,20 +279,25 @@ Repeat for each app with its own database and user.
 
 Once the infrastructure is running, follow these steps to add any new app.
 
-### 1. Copy Docker files from templates
+### 1. Scaffold the app
 
-Run `init.sh` from your app's repo root. This copies Docker files into the app repo and creates a production compose file in the infrastructure repo's `apps/` directory.
+Use the **`add-app` skill** — run `/add-app` in Claude Code, or just ask it to add a new
+app. It works out what the app actually needs, writes the Docker files and the production
+compose, verifies the stack runs locally, commits both repos, and prints the manual steps.
 
-**[Laravel](templates/laravel/)** — full stack Laravel + Vue projects. See [`templates/laravel/README.md`](templates/laravel/README.md) for customization details.
+The templates are file **sources** it copies and customises:
 
-**[Nuxt](templates/nuxt/)** — Nuxt 3/4 SSR apps. See [`templates/nuxt/README.md`](templates/nuxt/README.md) for details.
+**[Laravel](templates/laravel/)** — Laravel + Vue. See [`templates/laravel/README.md`](templates/laravel/README.md).
 
-```bash
-# From your app's repo root:
-bash /path/to/infrastructure/templates/laravel/init.sh my-app my-app.phnx-solution.com
-# or for Nuxt:
-bash /path/to/infrastructure/templates/nuxt/init.sh my-app my-app.phnx-solution.com
-```
+**[Nuxt](templates/nuxt/)** — Nuxt 3/4 SSR. See [`templates/nuxt/README.md`](templates/nuxt/README.md).
+
+**[SPA](templates/spa/)** — static / Vite SPA. See [`templates/spa/README.md`](templates/spa/README.md).
+
+The old `init.sh` scripts were removed: they only did the easy half (`cp` + `sed`) while
+the real work is detecting what the app needs and proving it runs. Copying a template
+verbatim is how you get a frontend stage that can't build the app.
+
+To do it by hand, read `.claude/skills/add-app/references/detect.md` first.
 
 ### 2. Set up GitHub Secrets
 

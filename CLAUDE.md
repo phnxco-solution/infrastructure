@@ -92,10 +92,22 @@ Traefik dashboard: traefik.phnx-solution.com
 
 ## Adding a New App
 
-1. Run `init.sh` from the template (`templates/laravel/`, `templates/nuxt/`, or `templates/spa/`) — copies Docker files into the app repo and creates a production compose file in `apps/<name>/`
-2. Customize as needed (remove unused PHP extensions, adjust memory limits, add scheduler)
-3. On VPS: `git pull` the infrastructure repo, add `.env` to `apps/<name>/`
-4. Traefik auto-discovers via labels — no other infrastructure changes needed
+**Use the `add-app` skill** (`/add-app`, or just ask to add a new app). It detects what
+the app actually needs, scaffolds both repos, verifies the stack locally, commits, and
+hands back the manual steps and `gh` commands.
+
+`templates/{laravel,nuxt,spa}/` are file **sources** the skill copies and customises —
+not a plan. Copying them verbatim is how you get a Node-only frontend stage that can't
+build a Wayfinder app, or an image with `public/hot` in it. The `init.sh` scripts that
+used to do that were removed for exactly this reason.
+
+Doing it by hand anyway: read `.claude/skills/add-app/references/detect.md` first, and
+`env-contract.md` before writing any `.env` — Laravel's defaults are all
+production-wrong and every one of them fails silently.
+
+Traefik auto-discovers via labels, so no other infrastructure change is needed. Every
+app still needs, and nothing creates for you: the `/opt/volumes/apps/<name>/storage`
+skeleton, a MySQL database and user, and `.env` in `apps/<name>/`.
 
 ## Docker Networking for App .env
 

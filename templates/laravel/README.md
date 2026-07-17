@@ -17,14 +17,13 @@ Production-ready Docker setup for Laravel + Vue apps on the shared infrastructur
 
 ## Quick Start
 
-Run `init.sh` from your app's repo root. This copies Docker files into the app repo and creates a production compose file in the infrastructure repo's `apps/` directory.
+Use the **`add-app` skill** (`/add-app`). It copies these files, substitutes the
+placeholders, customises them against what the app actually needs, verifies the stack
+locally, and creates `apps/<name>/docker-compose.yml`.
 
-```bash
-# From your app's repo root:
-bash /path/to/infrastructure/templates/laravel/init.sh my-app my-app.phnx-solution.com
-```
-
-This copies all files, replaces `{{APP_NAME}}`/`{{APP_DOMAIN}}` placeholders, and creates `apps/<name>/docker-compose.yml` in the infrastructure repo.
+These are sources, not a finished setup. Read the section below before assuming this
+Dockerfile can build your app — the `frontend` stage is Node-only and a good number of
+Laravel apps can't be built that way.
 
 ## Placeholders
 

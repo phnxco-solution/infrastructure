@@ -4,15 +4,14 @@ Docker template for Nuxt 3/4 SSR apps. Single Node.js container behind Traefik â
 
 ## Quick Start
 
-```bash
-# From your app repo root
-bash /path/to/infrastructure/templates/nuxt/init.sh <app-name> <app-domain>
+Use the **`add-app` skill** (`/add-app`). It copies these files, substitutes
+`{{APP_NAME}}`/`{{APP_DOMAIN}}`, customises them against what the app actually needs,
+verifies the stack locally, and creates `apps/<name>/docker-compose.yml`.
 
-# Example
-bash /opt/infrastructure/templates/nuxt/init.sh endlessly endlessly.phnx-solution.com
-```
-
-This copies Docker files into the app repo, replaces `{{APP_NAME}}`/`{{APP_DOMAIN}}` placeholders, and creates `apps/<name>/docker-compose.yml` in the infrastructure repo.
+These are sources, not a finished setup. Two assumptions baked in here bite hard:
+the Dockerfile copies Drizzle migration files unconditionally (the build fails for a
+Nuxt app without Drizzle), and the entrypoint only runs migrations when
+`NODE_ENV != production`. See `.claude/skills/add-app/references/nuxt.md`.
 
 ## Files
 

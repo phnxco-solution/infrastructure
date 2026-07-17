@@ -14,22 +14,20 @@ Docker template for static single-page apps built with Vite (Vue, React, Svelte,
 
 ## Quick Start
 
-```bash
-# From your app's repo root:
-bash /path/to/infrastructure/templates/spa/init.sh <app-name> <app-domain> [backend-host]
-```
+Use the **`add-app` skill** (`/add-app`). It copies these files, substitutes
+`{{APP_NAME}}` / `{{APP_DOMAIN}}` / `{{BACKEND_HOST}}`, verifies the built image serves
+locally, and creates `apps/<name>/docker-compose.yml`.
 
-Examples:
+Two shapes, and the skill needs to know which:
 
-```bash
-# SPA with backend proxy (same-origin /api and /storage)
-bash /opt/infrastructure/templates/spa/init.sh unimaginable-app unimaginable.phnx-solution.com unimaginable-nginx-1:80
+- **SPA with a backend proxy** — same-origin `/api` and `/storage`, proxied to the API's
+  nginx (e.g. `unimaginable-app` → `unimaginable-nginx-1:80`). `{{BACKEND_HOST}}` is
+  that upstream.
+- **Pure static SPA** — no backend; the proxy blocks come out of `nginx.conf` entirely.
 
-# Pure static SPA (no backend) — proxy blocks are stripped
-bash /opt/infrastructure/templates/spa/init.sh marketing-site marketing.phnx-solution.com
-```
-
-This copies Docker files into the app repo, replaces `{{APP_NAME}}` / `{{APP_DOMAIN}}` / `{{BACKEND_HOST}}` placeholders, and creates `apps/<name>/docker-compose.yml` in the infrastructure repo.
+These are sources, not a finished setup. Everything an SPA reads from
+`import.meta.env` is frozen at image build time — see
+`.claude/skills/add-app/references/spa.md`.
 
 ## Placeholders
 
