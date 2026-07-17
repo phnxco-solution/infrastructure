@@ -44,6 +44,26 @@ The template includes all services by default (vite, worker, scheduler). Remove 
 - **nginx.conf** — adjust `client_max_body_size` if your app handles larger uploads
 - **docker-compose.prod.yml** — adjust memory limits per service
 
+## When the Vite build needs PHP
+
+The `frontend` stage in `Dockerfile` and `Dockerfile.nginx` is Node-only. That
+breaks for apps whose Vite build reaches back into PHP:
+
+- **`@laravel/vite-plugin-wayfinder`** shells out to `php artisan wayfinder:generate`
+  on `buildStart`. No PHP, no `vendor/`, and the build fails outright.
+- **`laravel-vue-i18n`** reads the framework's own translations out of
+  `vendor/laravel/framework/src/Illuminate/Translation/lang/`. Without `vendor/`
+  it doesn't fail — it just bundles without them, and validation messages go
+  missing at runtime.
+
+These need the frontend stage to run on the PHP base with `vendor/` copied in and
+Node added, rather than `node:22-alpine`. Quick tell: if the app's CI runs
+`composer install` before `npm run build`, the Docker build has to as well.
+
+`apps/buduci-klasici` is the worked example. It also folds `Dockerfile.nginx` into
+`Dockerfile` as a target, so the (now much more expensive) frontend stage is built
+once rather than once per image.
+
 ## Staging vs production deploys
 
 The Dockerfile defaults to `composer install --no-dev` (production-correct).
