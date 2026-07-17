@@ -87,13 +87,29 @@ docker run --rm "$V-production" sh -c '
 
 ## 3. Run the stack
 
-Write a throwaway compose in the scratchpad — app + nginx + ssr, **sqlite**, so no MySQL
-is needed. Give services the same **network aliases as production** (`<app>-fpm`,
-`<app>-ssr`); the aliases are what's being tested.
+Write a throwaway compose in the scratchpad, with the same **network aliases as
+production** (`<app>-fpm`, `<app>-ssr`) — the aliases are part of what's being tested.
+
+**Use MySQL, not sqlite**, even though sqlite would be one less container. Production is
+MySQL 8.4, and migrations are exactly where the two diverge: anything MySQL-specific
+(`fullText()`, JSON columns, generated columns, an `ALTER` sqlite can't do) either fails
+here and reports a problem the app doesn't have, or passes here and fails on the VPS.
+Verifying against a different engine than you deploy is how `migrate` reported 18
+successful migrations into a throwaway sqlite file while the real database sat empty.
 
 ```yaml
 name: verify-<name>              # not "verify" — two onboardings would reconcile each other
 services:
+  mysql:
+    image: mysql:8.4             # same major as production
+    environment:
+      MYSQL_ROOT_PASSWORD: verify
+      MYSQL_DATABASE: verify
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h127.0.0.1 -uroot -pverify --silent"]
+      interval: 3s
+      retries: 20
+      start_period: 20s
   app:
     image: verify-<name>-production
     environment:
@@ -102,12 +118,17 @@ services:
       APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
       APP_URL: http://localhost:8088
       APP_LOCALE: sr                # the app's real default
-      DB_CONNECTION: sqlite
-      DB_DATABASE: /var/www/html/database/database.sqlite
-      SESSION_DRIVER: file
-      CACHE_STORE: file
+      DB_CONNECTION: mysql          # never sqlite — see above
+      DB_HOST: mysql
+      DB_DATABASE: verify
+      DB_USERNAME: root
+      DB_PASSWORD: verify
+      SESSION_DRIVER: file          # cache/session aren't on the path being verified;
+      CACHE_STORE: file             # skip the redis container
       QUEUE_CONNECTION: sync
       INERTIA_SSR_URL: http://<app>-ssr:13714
+    depends_on:
+      mysql: { condition: service_healthy }
     networks:
       default:
         aliases: [<app>-fpm]
@@ -128,11 +149,20 @@ networks: { default: }
 ```
 
 ```bash
-docker compose -f verify.yml up -d --wait --wait-timeout 90
-docker compose -f verify.yml exec -T app sh -c \
-  'touch database/database.sqlite && php artisan migrate --force'
+docker compose -f verify.yml up -d --wait --wait-timeout 120
+docker compose -f verify.yml exec -T app php artisan migrate --force
+docker compose -f verify.yml exec -T app php artisan about
 curl -s -o home.html -w "HTTP %{http_code} | %{size_download} bytes\n" http://localhost:8088/
 ```
+
+Read `about`'s **Drivers → Database** row and confirm it says `mysql`. If it says `sqlite`,
+the app fell back and everything after it is meaningless — that is the exact failure this
+stack exists to make impossible. Don't `grep | head` it: truncating past the row you came
+for is how you get a green check that checked nothing.
+
+Seed if the app's pages need data. An empty database renders a page that's technically 200
+and proves very little (`apps/buduci-klasici`'s home page reads opening hours; with none,
+there's nothing to look at).
 
 ## 4. Probe
 
