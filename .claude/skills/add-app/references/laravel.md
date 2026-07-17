@@ -3,6 +3,47 @@
 Source files: `templates/laravel/`. Worked example: `apps/buduci-klasici/` +
 the buduci-klasici repo (commits `7cb7a43`, `4f22064`).
 
+## What goes where
+
+Copy into the **app repo**, then substitute:
+
+| Template source | Destination | Placeholders |
+|---|---|---|
+| `docker/Dockerfile` | `docker/Dockerfile` | — |
+| `docker/Dockerfile.nginx` | `docker/Dockerfile.nginx` | — |
+| `docker/entrypoint.sh` | `docker/entrypoint.sh` | — |
+| `docker/nginx.conf` | `docker/nginx.conf` | `{{APP_NAME}}` (the fpm upstream — easy to miss) |
+| `.dockerignore` | `.dockerignore` | — |
+| `.github/workflows/deploy.yml` | `.github/workflows/deploy.yml` | `{{APP_NAME}}` |
+| `docker/docker-compose.prod.yml` | **`<infra>/apps/<name>/docker-compose.yml`** | `{{APP_NAME}}`, `{{APP_DOMAIN}}` |
+
+The last row is the one to notice: the production compose is a template file that lands
+in the *infra* repo under a different name, and is **not** copied into the app repo.
+
+The template also ships `docker-compose.yml` (local dev, with MySQL and Redis). Skip it
+unless the app actually wants that — most apps here have their own local workflow
+(`php artisan dev` + sqlite) that a MySQL compose would contradict. Skipping it also
+makes the Dockerfile's `development` target dead weight; drop that too.
+
+After substituting, prove none survive — every stack, every placeholder, not just this
+table's:
+
+```bash
+grep -rn "{{[A-Z_]*}}" docker/ .github/ <infra>/apps/<name>/
+```
+
+Match the pattern, not a memorised list: SPA adds `{{BACKEND_HOST}}` and greping for
+Laravel's two returns clean while it ships.
+
+How a survivor fails is not consistent, so don't rely on noticing it:
+
+- `{{APP_NAME}}` in `nginx.conf` is unquoted (`set $fpm_upstream {{APP_NAME}}-fpm:9000;`)
+  → nginx won't parse its config, the container won't start. Loud.
+- `{{APP_NAME}}` in `deploy.yml` → pushes to a nonsense image name.
+- `{{BACKEND_HOST}}` in the SPA's `nginx.conf` is **quoted** → parses fine, container
+  starts, site serves, and every `/api` and `/storage` request fails at runtime on a DNS
+  lookup for a host called `{{BACKEND_HOST}}`. Silent.
+
 ## Contents
 
 - [Image layout](#image-layout)
@@ -32,7 +73,28 @@ Drop the `development` target unless a local dev compose is actually shipped. Mo
 here have their own local workflow (`php artisan dev` + sqlite) and a compose with MySQL
 would contradict it.
 
-## When the Vite build needs PHP
+## The base stage
+
+Trim extensions against Phase 0 evidence, not the template's defaults (it ships gd, zip,
+bcmath and DomPDF fonts; most apps need none). Keep `pdo_mysql, mbstring, xml, dom,
+pcntl, opcache` + `redis`. `pcntl` is not optional with a worker — it handles SIGTERM.
+
+**`intl` needs `icu-data-full` on Alpine.** `icu-dev` alone pulls `icu-data-en`, and ICU
+then falls back to English for any other locale — *silently*. `Number::format($n, locale:
+'sr')` prints `198,450` instead of `198.450`. Nothing fails; the number is just wrong.
+Local machines and CI runners have full ICU, so every gate passes and only the container
+is broken:
+
+```dockerfile
+RUN apk add --no-cache \
+    icu-dev \
+    icu-data-full \    # not optional — icu-dev alone is English-only
+    ...
+```
+
+This is the shape of bug the verify phase exists for: a passing build, a healthy
+container, and wrong output. If the app is not English-only, render a page with a
+formatted number or date in Phase 4 and read it.
 
 `@laravel/vite-plugin-wayfinder` runs `php artisan wayfinder:generate` on `buildStart`.
 `laravel-vue-i18n` reads `vendor/laravel/framework/src/Illuminate/Translation/lang/`.
@@ -93,7 +155,8 @@ unless told to, so `bootstrap/app.php` **must** contain:
 $middleware->trustProxies(at: '*');
 ```
 
-Without it, verified by `scripts/probe-proxy.php`:
+Without it — verified by this skill's `scripts/probe-proxy.php`, run per
+`references/verify.md`:
 
 - `$request->ip()` returns Traefik's container IP → every IP-keyed rate limiter shares
   one bucket site-wide, so a throttle meant as spam defence locks out real users
@@ -126,6 +189,24 @@ holding DB/Redis credentials.
 The storage volume shadows the image's `storage/`, so it must exist and be seeded before
 first boot — see `references/handoff.md`. Keep it even with no uploads: logs live there.
 
+### The workflow is the other half of the service list
+
+`templates/laravel/.github/workflows/deploy.yml:98` hardcodes:
+
+```
+docker compose up -d --no-deps worker scheduler
+```
+
+Drop the scheduler per Phase 0 and leave that line alone → `no such service: scheduler`,
+**exit 1 under `set -e`**, after app and nginx are already up. Working site, red deploy,
+and `docker image prune` never runs. The template workflow also never builds or starts
+`ssr`; with SSR on, add the `--target ssr` build/push step and put `ssr` in the up line
+(app → ssr → nginx → worker).
+
+Every service added or dropped in `apps/<name>/docker-compose.yml` has a matching edit in
+`deploy.yml`. One decision, two files. The same trap exists on Nuxt: its workflow runs
+`drizzle-kit migrate` unconditionally, so a non-Drizzle app needs that step removed too.
+
 ## Queue settings that must agree
 
 The worker runs `--timeout=90`. `config/queue.php` redis defaults to
@@ -141,7 +222,9 @@ rendering — the site still works, so it's easy to ship broken.
 1. **The bundle must be in the app image.** `HttpGateway` short-circuits when
    `BundleDetector::detect()` finds nothing on disk, *before* any HTTP call. So
    `COPY --from=frontend .../bootstrap/ssr ./bootstrap/ssr` into `production` too, not
-   just into the ssr image. (`BundleDetector` looks for `bootstrap/ssr/{ssr,app}.{js,mjs}`.)
+   just into the ssr image. (`BundleDetector` checks `config('inertia.ssr.bundle')` first,
+   then `bootstrap/ssr/{ssr,app}.{js,mjs}`, then `public/js/{ssr,app}.js` — first hit wins,
+   so the commented-out `bundle` line in the stock config is fine to leave alone.)
 2. **The URL must be env-driven.** `config/inertia.php` hardcodes
    `'url' => 'http://127.0.0.1:13714'`, unreachable from a sibling container:
    ```php
@@ -183,6 +266,26 @@ still HTTP 200), so it never takes the site with it — but bring it up before t
 ## .dockerignore
 
 Start from `templates/laravel/.dockerignore`, then add every gitignored-but-locally-present
-artifact found in Phase 0. Non-negotiable: `public/hot`, `public/build`, `bootstrap/ssr`.
+artifact found in Phase 0. Non-negotiable: `public/hot`, `public/build`, `bootstrap/ssr`,
+`database/*.sqlite`.
+
+That last one is easy to miss and it corrupts the verify phase. Laravel hides it in a
+nested `database/.gitignore` (`*.sqlite*`), so it never shows in the repo root's
+`.gitignore` — but `COPY database ./database` in the production stage pulls it in, and a
+developer's local sqlite is typically hundreds of KB of real data. Consequences:
+
+- Phase 4's `touch database/database.sqlite && php artisan migrate --force` finds an
+  already-migrated file, prints **"Nothing to migrate"**, and the stack you verify serves
+  the developer's local data while looking green.
+- The image ships that data to GHCR.
+
+CI is unaffected (fresh checkout, file gitignored) — which is exactly why only the local
+verify build sees it, and exactly where the skill's "verify by running it" claim lives.
+Look for nested `.gitignore` files, not just the root one:
+
+```bash
+find . -name .gitignore -not -path "./node_modules/*" -not -path "./vendor/*"
+```
+
 Drop template lines that don't apply (`storage/clockwork`, `!.env.production`,
 `docker-compose.yml`) rather than carrying dead entries.

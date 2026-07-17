@@ -3,6 +3,23 @@
 Every row below replaces an assumption with evidence. Run them, then report a findings
 table. Cheap to run; each one has cost a real outage or a wrong deploy at least once.
 
+**Every command here runs from the app repo root.** `cd` there explicitly in each Bash
+call — the skill is invoked from the infra repo, so that is *not* where you start, and
+the working directory drifts between calls. Confirm before trusting any result:
+
+```bash
+cd <app repo> && pwd && ls composer.json package.json 2>/dev/null
+```
+
+**Zero hits and wrong directory look identical.** Every "no hits → delete the service"
+rule below is only valid if the directory searched actually exists. `grep -rl x app/`
+from the infra repo returns nothing — and nothing is exactly what says "this app needs no
+worker". Prove the haystack before believing the needle is absent:
+
+```bash
+ls -d app/ >/dev/null || echo "WRONG DIRECTORY — every result below is meaningless"
+```
+
 ## Contents
 
 - [Identify the stack](#identify-the-stack)
@@ -24,19 +41,42 @@ ls composer.json package.json nuxt.config.* vite.config.* index.html 2>/dev/null
 Confirm the framework major from `composer.json` / `package.json`, don't infer it from
 the folder name. Record it — it goes in the CLAUDE.md table row.
 
+### Nothing matches
+
+A Go service, a Python API, hand-written static HTML, a third-party image. There's no
+template, but the infra contract is identical for everything Traefik routes, so write the
+compose by hand and copy the closest existing app:
+
+| Shape | Model |
+|---|---|
+| Any containerised HTTP service | `apps/blogmana` — one service, labels, healthcheck |
+| Static files, no build step | `apps/unimaginable-landing` — plain `nginx:1.27-alpine` + a read-only volume. No image, no deploy workflow, no GHCR. |
+| Third-party image | `uptime-kuma` in the root `docker-compose.yml` |
+
+The invariants, whatever the stack: an image (GHCR for anything built here),
+`restart: unless-stopped`, a healthcheck (Autoheal keys off it), a memory limit,
+`traefik-public` plus `backend` **only** if it needs MySQL or Redis, and the Traefik
+labels with `entrypoints=websecure` and `tls=true`. The service name must not collide
+with other projects' names on the shared `traefik-public` network — that's precisely why
+the nuxt and spa templates say `web` instead of `app`/`nginx`.
+
+Phases 0, 4, 5 and 6 are stack-agnostic. Run them regardless — the detection questions
+below still apply, and an unfamiliar stack needs *more* verification, not less.
+
 ## Shared checks (every stack)
 
 | Question | Command | Why it matters |
 |---|---|---|
-| Default branch | `git branch --show-current` | `deploy.yml` triggers on `master`. On `main` it silently never fires. |
+| Default branch vs deploy trigger | `git branch --show-current`, then `grep -A4 '^on:' <the deploy.yml you copied>` | **The templates disagree — laravel fires on `master`, nuxt and spa on `main`.** Read the trigger in the workflow you actually copied and match it to the branch. A mismatch means the deploy never fires and nothing errors anywhere. |
 | Remote exists | `git remote -v` | No remote → Actions can't run at all. |
-| Already pushed? | `git rev-list --left-right --count origin/<br>...HEAD` | The user may have pushed mid-session, firing a deploy early. |
+| Already pushed? | `git rev-list --left-right --count @{u}...HEAD` (behind/ahead) | The user may push mid-session, firing a deploy before the VPS is ready. Re-check at Phase 5. |
 | Uncommitted WIP | `git status --short` | Never sweep it into your commit. Re-check right before staging. |
 | Existing CI | `find .github -type f` | Don't clobber. Note stock starter-kit workflows — they often fail for reasons unrelated to deployment. |
 | Build-time env | `grep -rn "import.meta.env.VITE_\|process.env.NUXT_PUBLIC_" resources/ app/ src/ 2>/dev/null` | **Each hit needs a build arg.** `.env` is not in the build context, so these bake in as empty and fail silently. |
 | Package manager | `ls package-lock.json pnpm-lock.yaml yarn.lock` | A stray `pnpm-workspace.yaml` with no `pnpm-lock.yaml` means npm. Use the real lockfile. |
 | Node version | app's CI workflow, `engines` in package.json | Pin it. `apk add nodejs` tracks Alpine and drifts (gave Node 24 when CI used 22). |
-| Dev artifacts | `cat .gitignore` | Everything gitignored and locally present must be in `.dockerignore` — see below. |
+| Dev artifacts | `find . -name .gitignore -not -path "./node_modules/*" -not -path "./vendor/*"` | Everything gitignored and locally present must be in `.dockerignore` — see below. Check **nested** `.gitignore` files, not just the root: Laravel hides `*.sqlite*` in `database/.gitignore`. |
+| App at repo root? | `ls composer.json package.json` at the root | If the app is in a subdirectory: the name comes from the app dir, not the repo; `context:` and `file:` in `deploy.yml` need the subpath. Two apps in one repo collide on the `deploy.yml` filename and both fire on every push — they need `deploy-<name>.yml` with a `paths:` filter. |
 
 ### Dev artifacts that poison an image
 
@@ -59,7 +99,7 @@ an image is a production bug:
 | **Does the Vite build need PHP?** | `grep -n "wayfinder\|laravel-vue-i18n" vite.config.*` | Any hit → the Node-only frontend stage **cannot build this app**. See `references/laravel.md`. |
 | **Cross-check** | does the app's CI run `composer install` before `npm run build`? | If yes, the Docker build must too. Decisive tell. |
 | **Inertia SSR?** | `grep -n "'enabled'" config/inertia.php`; `grep -n "build:ssr" package.json` | Enabled + a build:ssr script → SSR is on the table. Read the SSR contract in `references/laravel.md` before promising it. |
-| **trustProxies?** | `grep -n "trustProxies" bootstrap/app.php` | **Missing → signed URLs 403 and rate limiters key on Traefik's IP.** Applies to every Laravel app here. Run `scripts/probe-proxy.php`. |
+| **trustProxies?** | `grep -n "trustProxies" bootstrap/app.php` | **Missing → signed URLs 403 and rate limiters key on Traefik's IP.** Applies to every Laravel app here. Prove it in Phase 4 with this skill's `scripts/probe-proxy.php` (invocation in `references/verify.md` — note the infra repo has its own unrelated top-level `scripts/`). |
 | **Health path** | `grep -n "health:" bootstrap/app.php` | Laravel's own endpoint (usually `/up`). The template's Traefik check uses nginx's `/health` — either is fine, be deliberate. |
 | **Uploads?** | `grep -rn "Storage::\|->store(" app/` | No hits → nothing writes to `storage/app/public`, but the storage volume is still needed for **logs**. |
 
@@ -69,13 +109,17 @@ The template installs gd, zip, bcmath, intl and DomPDF fonts. Most apps need non
 Keep `pdo_mysql, mbstring, xml, dom, pcntl, opcache` + `redis`; add the rest only on a hit:
 
 ```bash
-grep -rn "Number::\|IntlDateFormatter\|NumberFormatter" app/ config/   # → intl
+grep -rn "Number::\|IntlDateFormatter\|NumberFormatter" app/ config/   # → intl (+ icu-data-full!)
 grep -rn "Intervention\|imagecreate\|->resize(" app/ config/           # → gd
 grep -rn "ZipArchive\|Excel\|Dompdf\|Pdf::" app/ config/               # → zip (+ gd, fonts)
 grep -rn "bcadd\|bcmul\|bcdiv\|bcsub" app/                             # → bcmath
 ```
 
 `pcntl` is not optional if there's a worker — it handles SIGTERM.
+
+If `intl` is needed **and the app is not English-only**, it also needs `icu-data-full`,
+or ICU silently formats every non-English locale as English. See `references/laravel.md`.
+Check the app's locale before deciding: `grep -n "APP_LOCALE" .env.example`.
 
 ## Node/Nuxt/SPA checks
 

@@ -1,8 +1,11 @@
 name: {{APP_NAME}}
 
 services:
-  # Service is named 'web' (not 'nginx') so its DNS alias on traefik-public
-  # doesn't collide with every other project's 'nginx' service.
+  # Named 'web' for consistency with the other Node/SPA projects. NOTE: the service name
+  # is a DNS alias on traefik-public and is NOT unique — several projects publish 'web',
+  # several publish 'nginx', and resolving either round-robins across all of them. Never
+  # address another project by service name; use the container name (<project>-<service>-1),
+  # which is unique. That matters here: {{BACKEND_HOST}} must be a container name.
   web:
     image: ghcr.io/phnxco-solution/{{APP_NAME}}:latest
     restart: unless-stopped

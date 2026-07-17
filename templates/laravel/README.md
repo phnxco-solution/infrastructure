@@ -9,8 +9,8 @@ Production-ready Docker setup for Laravel + Vue apps on the shared infrastructur
 | `docker/Dockerfile` | Multi-target PHP image (dev + production), OPcache with JIT, Redis, GD |
 | `docker/Dockerfile.nginx` | Nginx image with baked-in frontend assets (no shared volumes) |
 | `docker/entrypoint.sh` | CONTAINER_ROLE-based startup: migrations, storage link, optimize |
-| `docker/nginx.conf` | Gzip, fastcgi buffering, static asset caching, health endpoint |
-| `docker/docker-compose.prod.yml` | Production template: app, nginx, worker, scheduler (uses `{{APP_NAME}}`, `{{APP_DOMAIN}}`) |
+| `docker/nginx.conf` | Gzip, fastcgi buffering, static asset caching, health endpoint (uses `{{APP_NAME}}` for the fpm upstream) |
+| `docker/docker-compose.prod.yml` | Production template: app, nginx, worker, scheduler (uses `{{APP_NAME}}`, `{{APP_DOMAIN}}`). **Goes to `apps/<name>/docker-compose.yml` in the infra repo**, not into the app repo. |
 | `docker-compose.yml` | Local dev: app, vite, nginx, worker, scheduler, mysql, redis |
 | `.dockerignore` | Excludes node_modules, vendor, tests, etc. from Docker context |
 | `.github/workflows/deploy.yml` | GHA: builds 2 images (app + nginx), deploys via SSH (uses `{{APP_NAME}}`) |
@@ -27,12 +27,25 @@ Laravel apps can't be built that way.
 
 ## Placeholders
 
-Only two files contain placeholders:
+Three files contain placeholders:
 
 | Placeholder | Files | Example |
 |-------------|-------|---------|
-| `{{APP_NAME}}` | `docker/docker-compose.prod.yml`, `.github/workflows/deploy.yml` | `mega-catering` |
+| `{{APP_NAME}}` | `docker/docker-compose.prod.yml`, `.github/workflows/deploy.yml`, `docker/nginx.conf` | `mega-catering` |
 | `{{APP_DOMAIN}}` | `docker/docker-compose.prod.yml` | `mega-catering.phnx-solution.com` |
+
+`docker/nginx.conf` is the one that gets missed — `{{APP_NAME}}` there is the fpm
+upstream (`{{APP_NAME}}-fpm:9000`) and must match the network alias in the production
+compose. Left unsubstituted, nginx fails to parse its config and the container won't
+start. After substituting, check nothing survived:
+
+```bash
+grep -rn "{{APP_NAME}}\|{{APP_DOMAIN}}" docker/ .github/ /path/to/infrastructure/apps/<name>/
+```
+
+**The deploy trigger differs per template** — this one fires on `master`; the nuxt and
+spa templates fire on `main`. Match it to the app's default branch or the deploy never
+runs, silently.
 
 ## What to Customize
 

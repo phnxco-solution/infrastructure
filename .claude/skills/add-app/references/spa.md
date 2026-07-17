@@ -21,6 +21,20 @@ Two-stage build: `node:22-alpine` runs `npm ci && npm run build`, then the resul
 copied into nginx. Confirm the build output directory — the template copies `/app/dist`,
 which is Vite's default but not universal (`vite.config` `build.outDir`).
 
+## What goes where
+
+`templates/spa/README.md` has the file list. This template is the smallest — **no
+`docker/Dockerfile`, no `docker/entrypoint.sh`, no local-dev `docker-compose.yml`**; the
+image builds from `docker/Dockerfile.nginx` alone. Two things to know first:
+
+- **`docker/docker-compose.prod.yml` → `<infra>/apps/<name>/docker-compose.yml`.** A
+  template file landing in the *infra* repo under a different name, not copied into the
+  app repo. Phase 3 depends on it.
+- **Three placeholders, not two.** `{{APP_NAME}}` and `{{APP_DOMAIN}}` in the compose and
+  workflow, plus **`{{BACKEND_HOST}}` in `nginx.conf`** — see below. Prove none survive
+  with `grep -rn "{{[A-Z_]*}}" docker/ .github/ <infra>/apps/<name>/`. Greping for
+  Laravel's two returns clean while `{{BACKEND_HOST}}` ships.
+
 ## Two variants
 
 | Variant | When | Shape |
@@ -41,8 +55,21 @@ that API's nginx container, rather than calling it cross-origin:
 unimaginable-app  ->  /api, /storage  ->  unimaginable-nginx-1:80
 ```
 
-`{{BACKEND_HOST}}` is that upstream (`<api-app>-nginx-1:80`). It also means the `web`
-service needs the network the API is reachable on.
+`{{BACKEND_HOST}}` is that upstream. **It must be the container name
+(`unimaginable-nginx-1:80`), never the service name.** Service names are not unique on
+`traefik-public` — five projects publish `nginx` and four publish `web`, so `nginx:80`
+round-robins across five tenants and would proxy most of this app's API traffic into
+other people's containers. Container names (`<project>-<service>-1`) are unique.
+
+Check which network actually connects the two, and don't just copy `apps/unimaginable-app`:
+its `backend` membership is a red herring — `unimaginable`'s nginx is on `default` +
+`traefik-public`, not `backend`, so that proxy works over `traefik-public`.
+
+**This placeholder fails silently, unlike Laravel's.** It's quoted in the config
+(`set $backend_upstream "{{BACKEND_HOST}}";`), so nginx parses it happily, the container
+starts, and the site serves. Only `/api` and `/storage` break — at runtime, on a DNS
+lookup for a host literally named `{{BACKEND_HOST}}`. Nothing in a build, a healthcheck
+or a homepage curl catches it, so **curl an API route in Phase 4**, not just `/`.
 
 Establish which shape applies in Phase 0 — `grep -rn "VITE_API\|axios\|fetch(" src/` and
 look at whether URLs are relative (`/api/...`, proxied) or absolute (cross-origin, and

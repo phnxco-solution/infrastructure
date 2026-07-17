@@ -8,10 +8,17 @@ Use the **`add-app` skill** (`/add-app`). It copies these files, substitutes
 `{{APP_NAME}}`/`{{APP_DOMAIN}}`, customises them against what the app actually needs,
 verifies the stack locally, and creates `apps/<name>/docker-compose.yml`.
 
-These are sources, not a finished setup. Two assumptions baked in here bite hard:
-the Dockerfile copies Drizzle migration files unconditionally (the build fails for a
-Nuxt app without Drizzle), and the entrypoint only runs migrations when
-`NODE_ENV != production`. See `.claude/skills/add-app/references/nuxt.md`.
+These are sources, not a finished setup. One assumption baked in here will bite: the
+Dockerfile assumes **Drizzle**, and `COPY --from` of a missing path is a hard build
+failure, so a Nuxt app without it cannot build past the production stage. Both blocks are
+marked `DRIZZLE ONLY` — delete them for such an app (`phnx-solution-coming-soon` is the
+worked example).
+
+Not a bug, in case it reads like one: the entrypoint only migrates when
+`NODE_ENV != production`, and production migrations run from the deploy workflow instead,
+before the new container takes traffic. That mirrors the Laravel template deliberately.
+
+See `.claude/skills/add-app/references/nuxt.md`.
 
 ## Files
 

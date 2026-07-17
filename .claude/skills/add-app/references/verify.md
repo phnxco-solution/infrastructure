@@ -18,11 +18,56 @@ Report what was **observed**. "Should work" is not a result.
 
 ## 1. Build every target
 
+Which command depends on the layout Phase 2 produced. Look, don't assume — the
+**unmodified Laravel template has no `nginx` target** (it ships `base, composer-deps,
+frontend, development, production` plus a separate `Dockerfile.nginx`), so the collapsed
+form below fails on it with `target stage "nginx" could not be found`:
+
 ```bash
-for t in production nginx ssr; do
-  DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --target "$t" -t "verify-$t" .
+grep -n "^FROM.*AS " docker/Dockerfile     # which targets exist?
+ls docker/Dockerfile.nginx 2>/dev/null     # two-file layout?
+```
+
+**Namespace the tags per app.** Image tags are global to the daemon, so a fixed
+`verify-production` survives a failed build and keeps pointing at whatever app you
+onboarded last — every probe then passes green **against the wrong image**, and you
+commit on the strength of it. Use `V="verify-<name>"` throughout:
+
+```bash
+V="verify-<name>"
+```
+
+**Two-file layout** — the template as shipped, correct when the frontend stage is
+Node-only:
+
+```bash
+DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --target production -t "$V-production" .
+DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile.nginx -t "$V-nginx" .
+```
+
+**Collapsed layout** — one Dockerfile with `nginx`/`ssr` targets, needed when the build
+needs PHP (`references/laravel.md`):
+
+```bash
+for t in production nginx ssr; do      # drop ssr unless SSR was chosen
+  DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --target "$t" -t "$V-$t" . || exit 1
 done
 ```
+
+Note the `|| exit 1` — a bare `for` loop swallows a failed build and moves on. Then
+confirm you're about to probe what you just built, not a survivor:
+
+```bash
+docker image inspect "$V-production" --format 'built {{.Created}}'   # must be seconds ago
+```
+
+If a probe result looks too good, check that timestamp before believing it.
+
+**Nuxt** builds `--target production` from `docker/Dockerfile` — one image, and only ever
+one. Even the sidecar shape (`apps/endlessly`) builds no nginx image: it runs stock
+`nginx:1.27-alpine` with a config mounted from the infra repo.
+
+**SPA** builds `-f docker/Dockerfile.nginx` only — there is no `docker/Dockerfile`.
 
 Failures here are usually the frontend stage — see `references/laravel.md`.
 
@@ -31,7 +76,7 @@ Failures here are usually the frontend stage — see `references/laravel.md`.
 Confirm the build did what was claimed, rather than trusting exit 0:
 
 ```bash
-docker run --rm verify-production sh -c '
+docker run --rm "$V-production" sh -c '
   ls resources/js/routes resources/js/actions   # wayfinder actually generated?
   ls public/build/manifest.json                 # assets present?
   ls public/hot 2>&1                            # MUST be "No such file"
@@ -47,10 +92,10 @@ is needed. Give services the same **network aliases as production** (`<app>-fpm`
 `<app>-ssr`); the aliases are what's being tested.
 
 ```yaml
-name: verify
+name: verify-<name>              # not "verify" — two onboardings would reconcile each other
 services:
   app:
-    image: verify-production
+    image: verify-<name>-production
     environment:
       CONTAINER_ROLE: app
       APP_ENV: production
@@ -71,11 +116,11 @@ services:
       interval: 5s
       start_period: 10s
   nginx:
-    image: verify-nginx
-    ports: ["8088:80"]
+    image: verify-<name>-nginx
+    ports: ["8088:80"]           # if taken, pick another and say which — don't kill the holder
     depends_on: { app: { condition: service_healthy } }
   ssr:
-    image: verify-ssr
+    image: verify-<name>-ssr
     networks:
       default:
         aliases: [<app>-ssr]
@@ -104,18 +149,39 @@ text = [t.strip() for t in re.findall(r'>([^<>]{3,45})<', inner) if t.strip()]
 Check the `<title>` and `<html lang>` in the same response — that's where a baked-in
 `VITE_APP_NAME` and the SSR locale bug both show up.
 
-**Proxy behaviour** (every Laravel app): run `scripts/probe-proxy.php` in the app image.
-It must report the forwarded client IP, `isSecure: true`, and `hasValidSignature: true`.
+**Proxy behaviour** (every Laravel app): run this skill's `scripts/probe-proxy.php` inside
+the app image. It must report the forwarded client IP, `isSecure: true` and
+`hasValidSignature: true`.
+
+| Exit | Meaning |
+|---|---|
+| 0 | PASS — proxy headers trusted |
+| 1 | FAIL — the app is missing `trustProxies`, see `references/laravel.md` |
+| 2 | **ABORT — the probe couldn't run.** Not a verdict about the app. Bad `APP_URL`, or the app wouldn't boot. Fix the invocation and re-run; don't "fix" the app. |
+
+`APP_URL` **must be https** — signed URLs are generated from it, so an http one makes the
+probe report a failure that isn't real. It aborts rather than lie. `APP_KEY` isn't needed
+(signing and verification use the same key, whatever it is).
+
+The script lives in the **infra** repo, not the app repo, so mount it by absolute path.
+`$PWD` here is the app repo, and Docker will silently create an empty *directory* for a
+bind-mount source that doesn't exist, giving you a baffling "Could not open input file":
 
 ```bash
-docker run --rm -e APP_KEY=base64:AAAA... -e APP_URL=https://<domain> \
-  -v "$PWD/probe-proxy.php:/tmp/probe.php:ro" verify-production php /tmp/probe.php
+SKILL=<infra-repo>/.claude/skills/add-app          # absolute
+docker run --rm -e APP_URL=https://<domain> \
+  -v "$SKILL/scripts/probe-proxy.php:/tmp/probe.php:ro" \
+  "$V-production" php /tmp/probe.php
 ```
+
+Read the **exit code**, not the tail of the output — and don't pipe it through `tail`,
+which replaces the status with `tail`'s own. That mistake has already produced a
+confident "exit 0" from a failed build twice today.
 
 **Config resolution** — prove each env var you introduced actually lands:
 
 ```bash
-docker run --rm -e INERTIA_SSR_URL=http://x-ssr:13714 verify-production \
+docker run --rm -e INERTIA_SSR_URL=http://x-ssr:13714 "$V-production" \
   php artisan tinker --execute="dump(config('inertia.ssr'), (new Inertia\Ssr\BundleDetector)->detect());"
 ```
 
@@ -144,13 +210,23 @@ npx vue-tsc --noEmit && npx eslint <changed files> && php artisan test
 Run these against the tree as it stands at commit time — the user may have committed
 work mid-session.
 
-## Clean up
+## Clean up — on every exit, not just success
+
+This runs after a failed build and an aborted session too. A half-finished onboarding
+leaves more behind than a finished one.
 
 ```bash
 docker compose -f verify.yml down -v
-docker rmi -f verify-production verify-nginx verify-ssr
+docker rmi -f "$V-production" "$V-nginx" "$V-ssr" 2>/dev/null
 ```
 
-Leave the user's working tree as found. Build artifacts produced by a verification run
-(`bootstrap/ssr/`, `public/build/`) are gitignored and harmless — mention them, don't
-`rm -rf` them.
+Then **say what you're leaving behind that git won't surface**:
+
+- **Edits to the user's application code** — `trustProxies` in `bootstrap/app.php`, the
+  `config/inertia.php` env change, the SSR locale fix in `app.ts`. Their code, uncommitted,
+  mixed into their tree, and they didn't ask for it. Name them by path. Bailing out while
+  silently leaving `bootstrap/app.php` modified is worse than changing nothing at all.
+- **Build artifacts** (`bootstrap/ssr/`, `public/build/`) — gitignored and harmless.
+  Mention them; don't `rm -rf` them.
+
+If port 8088 is taken, pick another and say which — never kill whatever holds it.
