@@ -83,6 +83,7 @@ Two Docker networks:
 | unimaginable | api.unimaginable.phnx-solution.com | Laravel 12 (API) |
 | unimaginable-app | unimaginable.phnx-solution.com | Vite SPA (Vue 3 PWA) |
 | voucher-tracker | voucher-tracker.phnx-solution.com | Nuxt 4 SSR + MySQL (Drizzle) |
+| buduci-klasici | buduci-klasici.phnx-solution.com | Laravel 13 + Vue 3 (Inertia SSR) |
 | uptime-kuma | status.phnx-solution.com | Uptime monitoring |
 
 Traefik dashboard: traefik.phnx-solution.com
