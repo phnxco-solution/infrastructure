@@ -9,6 +9,20 @@ Onboarding is not scaffolding. Copying template files is the easy part; the work
 **finding out what this particular app needs** and **proving the stack runs before it
 reaches the VPS**. The files in `templates/` are sources, not a plan.
 
+## Arguments
+
+Anything given is a head start, not a spec — verify each against the repo, and ask for
+what's missing. Accepted in any order:
+
+- **a path** → the app repo (`~/Projects/www/clients/foo`)
+- **a hostname** → the production domain (`foo.phnx-solution.com`)
+- **a bare name** → the app name; find the repo before assuming a path
+
+With no arguments, ask for the repo path first — everything in Phase 0 needs it.
+Derive the app name from the repo directory and confirm it: it becomes the compose
+project name, the image name, the Traefik router and the volume path, and it is
+painful to change later.
+
 ## Three rules
 
 1. **Detect, don't assume.** Every claim about the app (needs a worker, needs intl,
