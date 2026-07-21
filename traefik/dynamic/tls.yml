@@ -13,3 +13,6 @@ tls:
       keyFile: /etc/traefik/certs/unimaginableapp-key.pem
     - certFile: /etc/traefik/certs/unimaginable.pem
       keyFile: /etc/traefik/certs/unimaginable-key.pem
+    # dusanimarija.cloud — separate Cloudflare zone (endlessly's primary domain)
+    - certFile: /etc/traefik/certs/dusanimarija.pem
+      keyFile: /etc/traefik/certs/dusanimarija-key.pem

@@ -40,7 +40,7 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.endlessly.rule=Host(`endlessly.phnx-solution.com`)"
+      - "traefik.http.routers.endlessly.rule=Host(`dusanimarija.cloud`)"
       - "traefik.http.routers.endlessly.entrypoints=websecure"
       - "traefik.http.routers.endlessly.tls=true"
       - "traefik.http.services.endlessly.loadbalancer.server.port=80"

@@ -79,7 +79,7 @@ Two Docker networks:
 |-----|--------|------|
 | mega-catering | app.megacatering.rs (separate CF zone) | Laravel 12 + Vue 3 |
 | phnx-solution | phnx-solution.com | Nuxt 4 SSR (coming-soon page) |
-| endlessly | endlessly.phnx-solution.com | Nuxt 3 SSR |
+| endlessly | dusanimarija.cloud (separate CF zone) | Nuxt 3 SSR |
 | blogmana | mana.phnx-solution.com | Nuxt SSR |
 | unimaginable | unimaginable-api.phnx-solution.com | Laravel 12 (API) |
 | unimaginable-app | unimaginable.phnx-solution.com | Vite SPA (Vue 3 PWA) |
