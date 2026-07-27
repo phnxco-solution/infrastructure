@@ -1,7 +1,6 @@
 # Static / Vite SPA apps
 
-Source files: `templates/spa/`. Live examples: `apps/unimaginable-app` (built image),
-`apps/unimaginable-landing` (plain nginx + a volume, no image at all).
+Source files: `templates/spa/`.
 
 > Less battle-tested than `references/laravel.md`. Read off the templates and the
 > deployed composes. The Phase 0 and Phase 4 protocols are stack-agnostic — run them.
@@ -40,7 +39,7 @@ image builds from `docker/Dockerfile.nginx` alone. Two things to know first:
 | Variant | When | Shape |
 |---|---|---|
 | **Built image** | The SPA has a build step and its own repo | `templates/spa/` as-is; deploy workflow builds and pushes one image |
-| **Files in a volume** | A hand-maintained static site | No image, no build, no deploy workflow. `nginx:1.27-alpine` with `/opt/volumes/apps/<name>/public:/usr/share/nginx/html:ro`. See `apps/unimaginable-landing`. |
+| **Files in a volume** | A hand-maintained static site | No image, no build, no deploy workflow. `nginx:1.27-alpine` with `/opt/volumes/apps/<name>/public:/usr/share/nginx/html:ro`. |
 
 Don't scaffold a build pipeline for a site that's three HTML files. Ask which it is if
 detection is ambiguous.

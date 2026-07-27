@@ -50,7 +50,7 @@ compose by hand and copy the closest existing app:
 | Shape | Model |
 |---|---|
 | Any containerised HTTP service | `apps/blogmana` — one service, labels, healthcheck |
-| Static files, no build step | `apps/unimaginable-landing` — plain `nginx:1.27-alpine` + a read-only volume. No image, no deploy workflow, no GHCR. |
+| Static files, no build step | plain `nginx:1.27-alpine` + a read-only volume (`/opt/volumes/apps/<name>/public:/usr/share/nginx/html:ro`). No image, no deploy workflow, no GHCR. |
 | Third-party image | `uptime-kuma` in the root `docker-compose.yml` |
 
 The invariants, whatever the stack: an image (GHCR for anything built here),
@@ -128,7 +128,7 @@ Check the app's locale before deciding: `grep -n "APP_LOCALE" .env.example`.
 | Server port | template compose / `nuxt.config` | Traefik `loadbalancer.server.port` must match (Nuxt: 3000). |
 | Runtime env vs build env | `grep -rn "NUXT_PUBLIC_\|import.meta.env" .` | `NUXT_PUBLIC_*` are runtime; `VITE_*` bake in at build. Different failure modes. |
 | DB access | `grep -rn "drizzle\|prisma\|mysql2" package.json` | Needs the `backend` network and DB env. |
-| Static or server? | `nuxt.config` `ssr:`/`nitro.preset` | A prerendered site is nginx + a volume (like `unimaginable-landing`), not a Node service. |
+| Static or server? | `nuxt.config` `ssr:`/`nitro.preset` | A prerendered site is nginx + a volume, not a Node service. |
 
 ## Findings table
 

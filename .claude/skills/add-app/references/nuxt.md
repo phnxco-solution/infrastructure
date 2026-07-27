@@ -55,7 +55,7 @@ There is no `Dockerfile.nginx` and no `nginx.conf` in this template.
 | Assumption | Reality | Check |
 |---|---|---|
 | The app uses Drizzle | **Confirmed by build test.** The Dockerfile installs `drizzle-kit drizzle-orm mysql2` into `/migrate`, then COPYs `server/database/migrations`, `drizzle.config.ts` and `/migrate/node_modules`. `COPY --from` of a missing path is a hard failure: a non-Drizzle app dies with `ERROR: "/app/server/database/migrations": not found` after `npm run build` has already succeeded. Delete **all four** — Nitro's `.output` is self-contained, so a non-Drizzle app needs no production `node_modules`. Both blocks are marked `DRIZZLE ONLY` in the template. Worked example: `phnx-solution-coming-soon`. | `grep -n "drizzle" package.json` |
-| It's an SSR app | A prerendered/static Nuxt is nginx + a volume (`apps/unimaginable-landing`), not a Node service at all. | `nuxt.config` `ssr:` / `nitro.preset` |
+| It's an SSR app | A prerendered/static Nuxt is nginx + a volume, not a Node service at all. | `nuxt.config` `ssr:` / `nitro.preset` |
 | Native addons | The build stage installs `python3 make g++` for sharp/bcrypt. Drop it if nothing needs compiling. | `grep -n "sharp\|bcrypt" package.json` |
 | Health at `/` | Traefik and the container healthcheck both hit `/`. Fine unless `/` is expensive or redirects. | — |
 

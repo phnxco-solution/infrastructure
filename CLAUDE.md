@@ -81,8 +81,7 @@ Two Docker networks:
 | phnx-solution | phnx-solution.com | Nuxt 4 SSR (coming-soon page) |
 | endlessly | dusanimarija.cloud (separate CF zone) | Nuxt 3 SSR |
 | blogmana | mana.phnx-solution.com | Nuxt SSR |
-| unimaginable | api.unimaginable.rs (separate CF zone) | Laravel 12 (API) |
-| unimaginable-landing | unimaginable.rs (separate CF zone) | Static site (nginx, files in volume) |
+| unimaginable | unimaginable.rs + api.unimaginable.rs (separate CF zone) | Laravel 12 (API + landing) |
 | voucher-tracker | voucher-tracker.phnx-solution.com | Nuxt 4 SSR + MySQL (Drizzle) |
 | buduci-klasici | buduci-klasici.phnx-solution.com | Laravel 13 + Vue 3 (Inertia SSR) |
 | uptime-kuma | status.phnx-solution.com | Uptime monitoring |
