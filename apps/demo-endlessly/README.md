@@ -49,11 +49,18 @@ Traps:
 ## First boot
 
 ```bash
-# Storage skeleton — as deploy, NOT sudo. Image ends `USER node` (uid 1000);
-# deploy is also 1000, so a sudo-created root-owned tree silently breaks uploads
-# and daily logging while the healthcheck still passes.
+# Storage skeleton. Chown by NUMBER: the image ends `USER node` = uid 1000, and on
+# this VPS `deploy` is 1001 (usanzadunje holds 1000). Creating the tree as either
+# root or deploy leaves it unwritable by the container.
 mkdir -p /opt/volumes/apps/demo-endlessly/storage/uploads /opt/volumes/apps/demo-endlessly/logs
+chown -R 1000:1000 /opt/volumes/apps/demo-endlessly
+docker compose exec -T app touch /app/storage/.probe && echo writable
 ```
+
+Mode 755 owned by 1001 is the trap: the container can read and traverse, so the site
+renders normally and only writes fail. Uploads recover as soon as ownership is fixed,
+but `docker/entrypoint.sh` opens its daily-log file once at container start — if that
+failed, `docker compose restart app` is needed to get logging back.
 
 ```sql
 CREATE DATABASE demo_endlessly CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

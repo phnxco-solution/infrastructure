@@ -37,8 +37,9 @@ Two Docker networks:
 - **Ubuntu 22.10+ SSH socket activation**: `ssh.socket` owns the listen port and ignores `sshd_config`'s `Port`. `setup.sh` disables it, enables `ssh.service`, and restarts. **Reboot after `setup.sh`** (new kernel + a stale sshd can linger on 22). Confirm `ssh -p 41922 deploy@ip` in a second terminal before closing root.
 - **Root needs `authorized_keys`** before `setup.sh` — it copies root→deploy and `set -e` aborts if root has no key.
 - **Docker bypasses UFW**: container-published 80/443 aren't protected by UFW alone. `firewall-docker.sh` (DOCKER-USER + Cloudflare ipset, run on boot by the systemd unit) enforces Cloudflare-only. Verify off-CF: `curl -I http://<ip>/` must time out.
-- **GHCR login required on the VPS** (as `deploy`) before pulling private app images, else `compose pull` → `unauthorized`.
-- **Ownership**: `chown -R deploy:deploy /opt/infrastructure` if anything was touched as root. **Never** chown `/opt/volumes` — container UIDs (`999`) own their data dirs and refuse otherwise.
+- **GHCR login required on the VPS** (as `deploy`) before pulling private app images, else `compose pull` → `unauthorized`. Docker creds are **per-user** — a `docker compose pull` as `root` fails `denied: denied` even though `deploy` is logged in.
+- **Ownership**: `chown -R deploy:deploy /opt/infrastructure` if anything was touched as root. **Never** chown `/opt/volumes` wholesale — container UIDs (`999`) own their data dirs and refuse otherwise.
+- **`deploy` is uid 1001, not 1000** — `usanzadunje` holds 1000. Node app images end `USER node` = uid **1000**, so per-app volumes must be `chown -R 1000:1000 /opt/volumes/apps/<name>` (by number; `deploy:deploy` is wrong). Mode 755 owned by 1001 lets the container read but not write: the site renders fine, uploads and daily logs silently fail.
 - **DNS last**: don't repoint a host until its app container is up on the target VPS, or Traefik returns 404.
 - `cron.allow` is `644` (setgid `crontab` must read it); only `deploy` may SSH (`AllowUsers deploy`).
 - **DB GUI over SSH** (TablePlus → dockerized MySQL `127.0.0.1:3306`): the SSH hardening sets `AllowTcpForwarding local` — if it's ever `no`, the GUI logs in but the tunnel is refused ("Failed to create tunnel"). The tunnel user is `deploy`; connection type must be **MySQL** (8.4 uses `caching_sha2_password`), not MariaDB.

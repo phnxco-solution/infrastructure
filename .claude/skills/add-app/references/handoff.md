@@ -51,23 +51,39 @@ sudo chown -R 82:82 /opt/volumes/apps/<name>/storage
 `docker run --rm <base-image> id www-data`). `setup.sh` only creates `/opt/volumes/apps`,
 never the per-app tree.
 
-**Node apps: different UID, and `sudo` is the trap.** The nuxt template ends `USER node`
-= uid **1000**, and `setup.sh` already leaves `/opt/volumes/apps` owned by `deploy`, also
-uid 1000. So create the tree **as deploy, without sudo**:
+**Node apps: different UID, and the owner is a number, not a name.** The nuxt template
+ends `USER node` = uid **1000**. `deploy` is **not** uid 1000 on this VPS — `usanzadunje`
+holds 1000 and `deploy` is **1001**. So neither `sudo mkdir` (root) nor creating the tree
+as `deploy` (1001) produces a writable directory. **Chown by number:**
 
 ```bash
-mkdir -p /opt/volumes/apps/<name>/{storage,logs}    # no sudo → deploy:deploy (1000) = node
+mkdir -p /opt/volumes/apps/<name>/{storage,logs}
+chown -R 1000:1000 /opt/volumes/apps/<name>          # 1000 = node, NOT deploy
 ```
 
-`sudo` here is destructive by omission: root-owned dirs, the container can't write, and
-**nothing tells you** — the `/` healthcheck still passes, Traefik still routes, the site
-looks fine. Daily logging silently writes nothing, and anything persisted to
-`/app/storage` is dropped (`phnx-solution` writes every newsletter signup to
-`/app/storage/subscribers.ndjson`). Prove it instead:
+Never take the uid on faith — read it off the box and off an app that already works:
+
+```bash
+id -u deploy                                          # 1001 here, not 1000
+docker compose exec -T web id                         # what the container actually runs as
+stat -c '%u:%g %n' /opt/volumes/apps/endlessly/storage # what a working app looks like
+```
+
+Getting this wrong is destructive by omission: the container can't write and **nothing
+tells you** — the `/` healthcheck still passes, Traefik still routes, the site looks
+fine. Daily logging silently writes nothing, and anything persisted to `/app/storage` is
+dropped (`phnx-solution` writes every newsletter signup to
+`/app/storage/subscribers.ndjson`). Mode 755 owned by the wrong uid is the nastiest
+version: reads and traversal work, so the site renders and only writes fail. Prove it
+instead:
 
 ```bash
 docker compose exec -T web touch /app/storage/.probe && echo writable
 ```
+
+Fix ownership **before** first boot, or restart the container afterwards. Uploads recover
+the moment the mode changes, but `docker/entrypoint.sh` opens its daily-log file once at
+start — if that failed, logging stays dead until the container restarts.
 
 **Never `chown /opt/volumes`** wholesale — container UIDs own their data dirs.
 
