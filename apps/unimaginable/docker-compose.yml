@@ -44,43 +44,35 @@ services:
       - "traefik.http.services.unimaginable.loadbalancer.server.port=80"
       - "traefik.http.services.unimaginable.loadbalancer.healthcheck.path=/up"
       - "traefik.http.services.unimaginable.loadbalancer.healthcheck.interval=15s"
+      # Horizon dashboard — basic auth at the edge (hash lives in apps/unimaginable/.env,
+      # HORIZON_BASIC_AUTH — value MUST be single-quoted there: compose expands
+      # $name inside unquoted .env values and silently truncates htpasswd hashes).
+      # The app-side gate additionally requires HORIZON_DASHBOARD_OPEN=true, so an
+      # unset hash fails closed.
+      - "traefik.http.routers.unimaginable-horizon.rule=Host(`api.unimaginable.rs`) && PathPrefix(`/horizon`)"
+      - "traefik.http.routers.unimaginable-horizon.entrypoints=websecure"
+      - "traefik.http.routers.unimaginable-horizon.tls=true"
+      - "traefik.http.routers.unimaginable-horizon.priority=100"
+      - "traefik.http.routers.unimaginable-horizon.service=unimaginable"
+      - "traefik.http.routers.unimaginable-horizon.middlewares=unimaginable-horizon-auth"
+      - "traefik.http.middlewares.unimaginable-horizon-auth.basicauth.users=${HORIZON_BASIC_AUTH}"
     deploy:
       resources:
         limits:
           memory: 64M
 
-  worker:
+  horizon:
     image: ghcr.io/phnxco-solution/unimaginable:latest
     restart: unless-stopped
     env_file: .env
-    command: php artisan queue:work redis --queue=default --max-jobs=1000 --max-time=3600 --tries=3 --backoff=15 --timeout=90 --memory=128
-    volumes:
-      - /opt/volumes/apps/unimaginable/storage:/var/www/html/storage
-    networks:
-      - backend
-    depends_on:
-      app:
-        condition: service_healthy
-    stop_signal: SIGTERM
-    stop_grace_period: 120s
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'artisan queue:work' > /dev/null || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    deploy:
-      resources:
-        limits:
-          memory: 192M
-
-  content-worker:
-    image: ghcr.io/phnxco-solution/unimaginable:latest
-    restart: unless-stopped
-    env_file: .env
-    # Long-running content generation: AI calls + ffmpeg. Memory raised via -d so PHP can
-    # buffer audio/image payloads; --timeout=1500 mirrors local dev's 1200s for content jobs.
-    command: php -d memory_limit=384M artisan queue:work redis --queue=content-generation,content-regeneration --max-jobs=200 --max-time=3600 --tries=3 --backoff=30 --timeout=1500 --memory=320
+    environment:
+      CONTAINER_ROLE: horizon
+    # Horizon master supervises per-queue worker pools (app config/horizon.php).
+    # Grace must outlast the longest job (audio supervisor timeout 1500s); the
+    # autoheal label overrides autoheal's 10s default stop timeout for the same
+    # reason. Worker memory_limit (384M) is baked into the image — `-d` on the
+    # master does not propagate to spawned workers.
+    command: php artisan horizon
     volumes:
       - /opt/volumes/apps/unimaginable/storage:/var/www/html/storage
     networks:
@@ -90,16 +82,19 @@ services:
         condition: service_healthy
     stop_signal: SIGTERM
     stop_grace_period: 1530s
+    labels:
+      - "autoheal.stop.timeout=1530"
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'artisan queue:work' > /dev/null || exit 1"]
+      # Exit codes: 0 running, 1 paused (still healthy), 2 inactive.
+      test: ["CMD-SHELL", "php artisan horizon:status || [ $? -eq 1 ]"]
       interval: 30s
-      timeout: 5s
+      timeout: 15s
       retries: 3
-      start_period: 10s
+      start_period: 30s
     deploy:
       resources:
         limits:
-          memory: 448M
+          memory: 1536M
 
   scheduler:
     image: ghcr.io/phnxco-solution/unimaginable:latest

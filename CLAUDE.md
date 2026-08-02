@@ -6,7 +6,7 @@ Shared Docker infrastructure for all apps on a Hostinger VPS (4GB RAM / 2 CPU).
 
 - **Traefik v3.6** — reverse proxy, auto-discovers containers via Docker labels
 - **MySQL 8.4** — shared database, tuned for 4GB VPS (384M buffer pool, performance_schema OFF)
-- **Redis 7 Alpine** — cache, queues, sessions (128mb maxmemory, allkeys-lru, password-protected)
+- **Redis 7 Alpine** — cache, queues, sessions (128mb maxmemory, volatile-lru so no-TTL queue/Horizon/lock keys are never evicted, password-protected)
 - **Uptime Kuma** — self-hosted uptime monitoring with Slack/email alerts (runs on same VPS — pair with external monitor like UptimeRobot for VPS-level coverage)
 - **Autoheal** — auto-restarts unhealthy containers using Docker healthchecks
 
