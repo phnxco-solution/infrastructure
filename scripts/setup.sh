@@ -297,13 +297,15 @@ echo "Kernel hardening applied"
 # =============================================================================
 
 echo "=== Create directory structure ==="
-mkdir -p /opt/{infrastructure,volumes/{mysql,redis,uptime-kuma},backups/{mysql,volumes}}
+mkdir -p /opt/{infrastructure,volumes/{mysql,redis,uptime-kuma}}
 mkdir -p /opt/volumes/apps
+install -d -o root -g root -m 755 /opt/backups
+install -d -o root -g root -m 700 /opt/backups/apps
 
 # Targeted ownership (don't touch volume internals — containers manage their own UIDs)
-chown -R $DEPLOY_USER:$DEPLOY_USER /opt/infrastructure /opt/backups
+chown -R $DEPLOY_USER:$DEPLOY_USER /opt/infrastructure
 chown $DEPLOY_USER:$DEPLOY_USER /opt/volumes /opt/volumes/apps
-chmod 750 /opt/infrastructure /opt/backups
+chmod 750 /opt/infrastructure
 chmod 700 /opt/volumes
 
 # =============================================================================
@@ -406,12 +408,6 @@ EOF
 
 echo "=== Setup crontab for $DEPLOY_USER ==="
 CRON_CONTENT=$(cat <<'CRON'
-# Daily MySQL backup at 3 AM
-0 3 * * * /opt/infrastructure/backups/backup.sh >> /opt/backups/mysql/backup.log 2>&1
-
-# Weekly volume backup on Sunday at 4 AM
-0 4 * * 0 /opt/infrastructure/backups/volume-backup.sh >> /opt/backups/volumes/backup.log 2>&1
-
 # Weekly Docker cleanup on Sunday at 5 AM
 0 5 * * 0 docker image prune -af --filter "until=168h" >> /var/log/docker-prune.log 2>&1
 
@@ -445,4 +441,5 @@ echo "    2. Update GitHub Actions VPS_PORT secret to $SSH_PORT"
 echo "    3. Create .env from .env.example and fill in secrets"
 echo "    4. Add Cloudflare Origin Certificate to traefik/certs/"
 echo "    5. Run: cd /opt/infrastructure && docker compose up -d"
+echo "    6. Configure app backups and enable timers: backups/README.md"
 echo ""

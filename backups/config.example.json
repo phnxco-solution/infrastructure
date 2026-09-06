@@ -1,0 +1,22 @@
+{
+  "server": "production-vps",
+  "infrastructure_root": "/opt/infrastructure",
+  "volumes_root": "/opt/volumes/apps",
+  "backup_root": "/opt/backups/apps",
+  "mysql_container": "mysql",
+  "drive_remote": "gdrive:Infrastructure Backups",
+  "rclone_config": "/etc/infrastructure-backup/rclone.conf",
+  "age_recipients": ["REPLACE_WITH_PUBLIC_AGE_RECIPIENT"],
+  "minimum_free_bytes": 2147483648,
+  "restore_health_timeout_seconds": 180,
+  "alert_webhook_file": "/etc/infrastructure-backup/alert-webhook.txt",
+  "apps": {
+    "mega-catering": {"database": "auto", "owner": [82, 82]},
+    "unimaginable": {"database": "auto", "owner": [82, 82]},
+    "endlessly": {"database": "auto", "owner": [1000, 1000]},
+    "demo-endlessly": {"database": "auto", "owner": [1000, 1000]},
+    "phnx-solution": {"database": "auto", "owner": [1000, 1000]},
+    "blogmana": {"database": "auto", "owner": [1000, 1000]},
+    "voucher-tracker": {"database": "auto", "owner": [1000, 1000]}
+  }
+}

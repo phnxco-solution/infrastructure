@@ -1,0 +1,10 @@
+[Unit]
+Description=Retry app backup uploads hourly
+
+[Timer]
+OnCalendar=*-*-* *:35:00
+Persistent=true
+Unit=infrastructure-app-backup-upload.service
+
+[Install]
+WantedBy=timers.target

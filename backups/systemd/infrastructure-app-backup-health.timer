@@ -1,0 +1,10 @@
+[Unit]
+Description=Check app backup health hourly
+
+[Timer]
+OnCalendar=*-*-* *:50:00
+Persistent=true
+Unit=infrastructure-app-backup-health.service
+
+[Install]
+WantedBy=timers.target

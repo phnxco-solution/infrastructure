@@ -224,7 +224,7 @@ echo ""
 echo "=== Directory Structure ==="
 # =============================================================================
 
-for dir in /opt/infrastructure /opt/volumes /opt/volumes/mysql /opt/volumes/redis /opt/volumes/uptime-kuma /opt/volumes/apps /opt/backups /opt/backups/mysql /opt/backups/volumes; do
+for dir in /opt/infrastructure /opt/volumes /opt/volumes/mysql /opt/volumes/redis /opt/volumes/uptime-kuma /opt/volumes/apps /opt/backups /opt/backups/apps; do
   check "test -d $dir" "$dir exists"
 done
 
@@ -307,14 +307,25 @@ if [ -n "$CRONTAB" ]; then
   # Match against a here-string (not echo|eval) — a cron line contains a single
   # quote that breaks eval-based grepping
   cron_has() { if grep -qE "$1" <<<"$CRONTAB"; then pass "$2"; else fail "$2"; fi; }
-  cron_has 'backup\.sh' "MySQL backup cron present"
-  cron_has 'volume-backup\.sh' "Volume backup cron present"
   cron_has 'docker image prune' "Docker cleanup cron present"
   cron_has 'slow\.log' "MySQL slow log rotation present"
   cron_has 'app-.*\.log' "App log cleanup cron present"
 else
   fail "No crontab for $DEPLOY_USER"
 fi
+
+# =============================================================================
+echo ""
+echo "=== App Backup Timers ==="
+# =============================================================================
+
+for timer in infrastructure-app-backup.timer infrastructure-app-backup-upload.timer infrastructure-app-backup-health.timer; do
+  if systemctl is-enabled --quiet "$timer" 2>/dev/null && systemctl is-active --quiet "$timer"; then
+    pass "$timer enabled and active"
+  else
+    fail "$timer must be enabled and active (see backups/README.md)"
+  fi
+done
 
 # =============================================================================
 # Summary

@@ -54,8 +54,10 @@ infrastructure/
 │   ├── migrate-unpack.sh    # Restore data on new VPS
 │   └── verify-migration.sh  # Verify migrated data and services
 ├── backups/
-│   ├── backup.sh            # Daily MySQL dumps (14-day retention)
-│   └── volume-backup.sh     # Weekly storage backups (30-day retention)
+│   ├── backup.sh            # App backup/download/unpack/restore CLI
+│   ├── manager.py           # Encrypted per-app archives + Google Drive uploads
+│   ├── install.sh           # Activate 03:00 Europe/Belgrade timers after a restore test
+│   └── systemd/             # Daily backup, hourly upload retry and health timers
 └── templates/
     ├── laravel/             # Docker files for new Laravel apps
     ├── nuxt/                # Docker files for new Nuxt apps
@@ -133,7 +135,9 @@ This script:
 - Creates `traefik-public` and `backend` Docker networks
 - Sets up 2GB swap
 - Disables snapd, restricts cron access (`cron.allow` 644), secures shared memory
-- Configures cron for backups and Docker cleanup
+- Configures cron for Docker cleanup and log maintenance
+
+Configure daily app backups separately using [backups/README.md](backups/README.md).
 
 **After it finishes — confirm access, then reboot:**
 
@@ -153,7 +157,8 @@ sudo chown -R deploy:deploy /opt/infrastructure
 sudo reboot
 ```
 
-After it comes back, re-run `verify-setup.sh` — it should be all-clear.
+After it comes back, re-run `verify-setup.sh`. Backup timer checks pass after completing
+[backup setup](backups/README.md); finish that setup before going live.
 
 > **Warning:** SSH moves to port 41922 and root login is disabled. **Confirm the
 > `deploy` login on 41922 in a separate terminal before disconnecting or rebooting.**
@@ -554,12 +559,19 @@ docker exec -it mysql mysql -u root -p
 
 ### Manual backup
 
-```bash
-# MySQL
-/opt/infrastructure/backups/backup.sh
+The app-only Google Drive workflow is documented in [backups/README.md](backups/README.md).
+It captures apps online, uploads every encrypted set immediately, keeps the latest two
+sets locally and never cleans Drive. It includes listing, downloading, unpacking and
+app-scoped restoration with stopped writers. Redis and shared infrastructure are excluded.
+Activation requires configured Google authorization, a public encryption key and a
+successful isolated restoration test. The backup timer runs daily at 03:00 Europe/Belgrade.
 
-# Storage volumes
-/opt/infrastructure/backups/volume-backup.sh
+```bash
+# Create and upload a complete app backup set
+sudo /opt/infrastructure/backups/backup.sh run
+
+# Browse backups in Google Drive
+sudo /opt/infrastructure/backups/backup.sh list --source drive
 ```
 
 ### Restart services

@@ -1,0 +1,10 @@
+[Unit]
+Description=Check app backup age and storage capacity
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/opt/infrastructure/backups/backup.sh health

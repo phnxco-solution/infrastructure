@@ -1,5 +1,7 @@
 .env
 traefik/certs/*
 !traefik/certs/.gitkeep
-/backups/*.sql.gz
-/backups/*.tar.gz
+/backups/__pycache__/
+/backups/*.age
+/backups/config.json
+/backups/rclone.conf

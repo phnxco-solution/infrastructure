@@ -70,8 +70,7 @@ Two Docker networks:
 │       ├── storage/             # Laravel/Nuxt storage dirs
 │       └── logs/                # Nuxt daily logs (app-YYYY-MM-DD.log)
 └── backups/
-    ├── mysql/                   # Daily dumps (14-day retention)
-    └── volumes/                 # Weekly tars (30-day retention)
+    └── apps/                    # App backup sets (2 local), private staging, state and restore safety archives
 ```
 
 ## Current Apps
@@ -141,8 +140,9 @@ sudo chown -R deploy:deploy /opt/infrastructure
 # View logs
 docker compose logs -f <service>
 
-# Run backup manually
-/opt/infrastructure/backups/backup.sh
+# Encrypted app backup CLI (requires setup; see backups/README.md)
+sudo /opt/infrastructure/backups/backup.sh run
+sudo /opt/infrastructure/backups/backup.sh list --source drive
 
 # Verify OS hardening
 bash /opt/infrastructure/scripts/verify-setup.sh
@@ -158,6 +158,16 @@ bash /opt/infrastructure/scripts/verify-migration.sh
 ```
 
 ## Debugging / Logs
+
+**App backups:** `backups/README.md` is the operational guide. Run
+`backups/install.sh --restore-tested` after configuration and a real restore test to
+enable daily 03:00 Europe/Belgrade backups and hourly upload/health systemd timers.
+It captures each app online, keeps two complete local sets and every uploaded set
+in Drive (year/month/day/run/app). Redis and shared infrastructure are excluded.
+Restores stop only the selected app's services/workers and leave them stopped on
+partial failure. Never use the whole-VPS migration unpack script for a single-app
+rollback. App `.env` may be archived by the runtime on the VPS; never read protected
+workspace `.env` files during development/testing. Tests use synthetic data in /tmp.
 
 When something breaks, here's where to look:
 

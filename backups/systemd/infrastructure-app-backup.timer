@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily app backup at 03:00 Europe/Belgrade
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Europe/Belgrade
+Persistent=true
+AccuracySec=1min
+Unit=infrastructure-app-backup.service
+
+[Install]
+WantedBy=timers.target
