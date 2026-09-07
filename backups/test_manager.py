@@ -24,6 +24,89 @@ m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
 
 
+class AppSelectionTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="infrastructure-app-selection-", dir="/tmp")
+        self.addCleanup(self.temp.cleanup)
+        self.base = Path(self.temp.name).resolve()
+        self.infra = self.base / "infra"
+        self.storage = self.base / "volumes/demo/storage"
+        self.storage.mkdir(parents=True)
+        for name in ("demo", "phnx-solution"):
+            app = self.infra / "apps" / name
+            app.mkdir(parents=True)
+            # An omitted app needs neither a valid Compose model nor storage.
+            (app / "docker-compose.yml").write_text("invalid Compose; must use the test boundary\n")
+        self.config = {"infrastructure_root": str(self.infra),
+                       "volumes_root": str(self.base / "volumes"),
+                       "backup_root": str(self.base / "backups"),
+                       "apps": {"demo": {}}}
+        self.model = {"services": {"web": {"environment": {"DB_HOST": "mysql", "DB_DATABASE": "demo"},
+                         "volumes": [{"type": "bind", "source": str(self.storage), "target": "/app/storage"}]}}}
+
+    def compose_config(self, argv, **kwargs):
+        self.assertEqual(argv[argv.index("--project-name") + 1], "demo")
+        self.assertEqual(argv[-3:], ["config", "--format", "json"])
+        return json.dumps(self.model).encode()
+
+    def test_omitted_app_is_not_resolved_or_captured(self):
+        manager = m.Manager(self.config)
+        manager.init_local()
+
+        def capture(app, destination, run_id):
+            self.assertEqual(app["name"], "demo")
+            destination.parent.mkdir(parents=True)
+            destination.write_bytes(b"synthetic encrypted archive")
+            return {"file": destination.name, "sha256": m.digest(destination),
+                    "size": destination.stat().st_size, "database": app["database"]}
+
+        with patch.object(m, "run", side_effect=self.compose_config) as compose, \
+                patch.object(manager, "sql", side_effect=[b"mysql\nsys\ninformation_schema\nperformance_schema\ndemo\n", b""]), \
+                patch.object(manager, "capture", side_effect=capture) as captured, \
+                contextlib.redirect_stdout(io.StringIO()):
+            path = manager.create_set()
+        self.assertEqual(compose.call_count, 1)
+        self.assertEqual(captured.call_count, 1)
+        self.assertEqual(set(m.read_json(path / "manifest.json")["apps"]), {"demo"})
+        self.assertEqual(len(list((path / "apps").iterdir())), 1)
+        self.assertFalse((self.base / "volumes/phnx-solution").exists())
+
+    def test_app_selection_is_required_and_nonempty(self):
+        for value in (None, {}, [], "demo"):
+            with self.subTest(apps=value):
+                config = dict(self.config)
+                if value is None:
+                    del config["apps"]
+                else:
+                    config["apps"] = value
+                with patch.object(m, "run") as command, \
+                        self.assertRaisesRegex(m.BackupError, "apps must be a nonempty mapping"):
+                    m.Manager(config).apps()
+                command.assert_not_called()
+
+    def test_unknown_selected_app_is_rejected(self):
+        config = dict(self.config, apps={"missing": {}})
+        with patch.object(m, "run") as command, \
+                self.assertRaisesRegex(m.BackupError, "Configuration names an app that does not exist: missing"):
+            m.Manager(config).apps()
+        command.assert_not_called()
+
+    def test_invalid_selected_name_and_settings_are_rejected(self):
+        for apps, message in (({"../demo": {}}, "Invalid app/database/server name"),
+                              ({"demo": None}, "Invalid app settings")):
+            with self.subTest(apps=apps), patch.object(m, "run") as command, \
+                    self.assertRaisesRegex(m.BackupError, message):
+                m.Manager(dict(self.config, apps=apps)).apps()
+            command.assert_not_called()
+
+    def test_omitted_app_database_still_fails_global_coverage(self):
+        manager = m.Manager(self.config)
+        with patch.object(m, "run", side_effect=self.compose_config), \
+                patch.object(manager, "sql", return_value=b"mysql\ndemo\nexcluded_app_db\n"), \
+                self.assertRaisesRegex(m.BackupError, "Database coverage mismatch: unmapped=\\['excluded_app_db'\\]"):
+            manager.database_inventory()
+
+
 class FixtureManager(m.Manager):
     def __init__(self, config):
         super().__init__(config)

@@ -225,14 +225,17 @@ class Manager:
     def apps(self):
         if self._apps is not None:
             return self._apps
-        overrides = self.config.get("apps", {})
-        require(isinstance(overrides, dict), "apps must be a mapping")
-        found = {}
-        for path in sorted((self.infra / "apps").glob("*/docker-compose.yml")):
-            name = valid_name(path.parent.name)
-            require(path.parent.resolve() == path.parent and not path.is_symlink(), "Unsafe app directory")
-            spec = overrides.get(name, {})
+        selected = self.config.get("apps")
+        require(isinstance(selected, dict) and selected, "apps must be a nonempty mapping of apps to back up")
+        for name, spec in selected.items():
+            valid_name(name)
             require(isinstance(spec, dict), "Invalid app settings")
+        found = {}
+        for name in sorted(selected):
+            path = self.infra / "apps" / name / "docker-compose.yml"
+            require(path.parent.resolve() == path.parent and not path.is_symlink(), "Unsafe app directory")
+            require(path.is_file(), f"Configuration names an app that does not exist: {name}")
+            spec = selected[name]
             model = json.loads(run(self.compose(name, "config", "--format", "json")))
             services = model.get("services", {})
             require(services, f"No services in {name}")
@@ -276,8 +279,6 @@ class Manager:
             found[name] = {"name": name, "database": next(iter(dbs), None), "owner": owner,
                            "config_files": configs, "excludes": EXCLUDES + spec.get("excludes", []),
                            "services": services, "laravel": laravel}
-        require(found, "No app compose files found")
-        require(set(overrides) <= set(found), "Configuration names an app that does not exist")
         names = [a["database"] for a in found.values() if a["database"]]
         require(len(names) == len(set(names)), "Apps share a database; independent restore would affect another app")
         self._apps = found

@@ -1,6 +1,6 @@
 ---
 name: add-app
-description: Onboard a new website/app onto the shared Hostinger VPS — detect what the app actually needs, scaffold its Docker files, production compose and deploy workflow, verify the running stack locally, commit both repos, then hand back the exact manual steps and gh CLI commands. Use when adding a new app/website/service to the infrastructure, deploying an existing repo to the VPS for the first time, wiring an app into Traefik/MySQL/Redis, or when the user says "add a new app", "onboard this repo", "deploy this to the VPS", or invokes /add-app.
+description: Onboard a new website/app onto the shared Hostinger VPS — detect what the app needs, scaffold Docker and deployment files, register its backup coverage, verify locally, and hand back deployment steps. Use when adding a new app/project/website/service to the infrastructure, deploying an existing repo to the VPS for the first time, wiring an app into Traefik/MySQL/Redis, or invoking /add-app or $add-app.
 ---
 
 # Add an app to the shared VPS
@@ -13,8 +13,10 @@ reaches the VPS**. The files in `templates/` are sources, not a plan.
 
 Work spans two repos and it is easy to run a command in the wrong one:
 
-- **the infra repo** — holds this skill, `apps/`, `templates/`, `CLAUDE.md`. Normally the
-  session's cwd, since that's where the skill is invoked.
+- **the infra repo** — holds `apps/`, `templates/`, `backups/`, and `CLAUDE.md`.
+  Resolve it from the session's repository or a supplied path, and read its agent
+  instructions. The installed skill may live outside this repo; do not infer the
+  infra path from the skill's location.
 - **the app repo** — somewhere else entirely, e.g. `~/Projects/www/clients/<app>` or
   `~/Projects/www/personal/<app>`.
 
@@ -41,7 +43,7 @@ Derive the app name from the repo directory and confirm it: it becomes the compo
 project name, the image name, the Traefik router and the volume path, and it is
 painful to change later.
 
-## Three rules
+## Four rules
 
 1. **Detect, don't assume.** Every claim about the app (needs a worker, needs intl,
    builds with Node alone) must come from a command whose output was actually seen. The
@@ -50,6 +52,10 @@ painful to change later.
    `references/verify.md`. Do not commit before the stack serves a real page locally.
 3. **Never commit a secret.** `.env` lives on the VPS only. A value needed at image
    build time is a build arg, not a baked file.
+4. **Make the backup decision explicit.** Add each new project to backups as part of
+   onboarding. If coverage is unclear or an exclusion is proposed, ask the user and
+   record the answer; never silently omit a project. Respect existing exclusions:
+   `phnx-solution` remains deployed but is intentionally excluded from app backups.
 
 ## Claim the name, and check it isn't already done
 
@@ -92,14 +98,15 @@ Read `references/detect.md` and run every check. Report a short findings table b
 touching anything: stack, services needed, PHP extensions, build-time env, health path,
 and any template assumption this app breaks.
 
-Do not skip checks because the app "looks standard". The worked example
-(`apps/buduci-klasici/README.md`) looked standard and broke three template assumptions.
+Do not skip checks because the app "looks standard".
 
 ## Phase 1 — Ask
 
-Ask **only** what detection cannot answer. Use AskUserQuestion, batched into one call.
+Ask **only** what detection cannot answer. Use the available question tool or a concise
+message, batching related questions when useful.
 Typical: the production domain; SSR yes/no when the framework supports it but it costs
-RAM; memory limits when the box is tight. Never ask what a grep can answer.
+RAM; memory limits when the box is tight; the backup decision when coverage is unclear
+or exclusion is requested. Never ask what a repository search can answer.
 
 Check RAM headroom before proposing an optional service — the VPS is 4GB and committed
 limits already sit near it. `docker stats` on the VPS is the only real number; compose
@@ -119,6 +126,9 @@ Confirm the app's default branch matches the deploy workflow trigger (`master` v
 - `apps/<name>/docker-compose.yml` — production compose
 - `apps/<name>/README.md` — per-app doc; shape in `references/handoff.md`
 - `CLAUDE.md` — add the row to Current Apps, using the real host from the Traefik rule
+- `backups/config.example.json` — register the app and its storage owner/database
+  mapping. Read `references/backups.md` for required runtime configuration and proof.
+  Record an explicit user-approved exclusion instead when applicable.
 
 **TLS — count the labels in the host.** A wildcard matches exactly one label. So
 `app.phnx-solution.com` rides the default `origin.pem` and needs nothing, but
@@ -179,17 +189,21 @@ Read `references/handoff.md`. Produce, in this order:
    - **Laravel**: `docker compose exec -T app php artisan about` — environment,
      database, cache, queue and session drivers in one shot.
    - **Nuxt/SPA**: the service is `web`, and there is no artisan.
-     `docker compose exec -T web env | sort` for runtime vars, plus
-     `curl -sI https://<domain>`. Anything baked at build time can only be confirmed by
+     Check the required non-secret runtime settings by name, plus
+     `curl -sI https://<domain>`; do not dump the full environment, which contains
+     credentials. Anything baked at build time can only be confirmed by
      reading the built output or the page itself.
    - **Always**: `docker compose ps` — all healthy, nothing restarting. A restart loop
      is the loudest signal you have.
+5. **Backup coverage** — included or explicitly excluded, with the template change,
+   VPS configuration step, and preflight/first-upload result or exact remaining
+   command. A template edit alone does not configure the running backup service.
 
 ## Reference map
 
-All paths below are relative to this skill's own directory
-(`<infra>/.claude/skills/add-app/`) — note the infra repo also has an unrelated top-level
-`scripts/`.
+All `references/` and `scripts/` paths are relative to the loaded skill's own directory,
+whether it is the repo's `.claude/skills/add-app/` or an installed Codex copy. Paths
+starting with `<infra>/` refer to the separately resolved infrastructure repo.
 
 | File | Read when |
 |---|---|
@@ -200,5 +214,6 @@ All paths below are relative to this skill's own directory
 | `references/verify.md` | Phase 4, always |
 | `references/env-contract.md` | Phase 6, and whenever a deploy "succeeds" but behaves wrong |
 | `references/handoff.md` | Phase 6, always |
+| `references/backups.md` | Phase 3 and Phase 6, every new app |
 | `scripts/probe-proxy.php` | Phase 4, any Laravel app — proves proxy and signed-URL behaviour. Run it, don't read it. |
 | `<infra>/templates/<stack>/README.md` | Phase 2 — the per-stack file list and what to customise |

@@ -94,6 +94,21 @@ Traefik dashboard: traefik.phnx-solution.com
 the app actually needs, scaffolds both repos, verifies the stack locally, commits, and
 hands back the manual steps and `gh` commands.
 
+**Backups are part of onboarding.** Add every new app to the `apps` mapping in
+`backups/config.example.json` and the VPS's `/etc/infrastructure-backup/config.json`,
+or ask the user to decide before completing the handoff. Record any explicit
+exclusion in the app's README. The runtime config is separate from the repository:
+pulling a template change does not update it. Preserve its encryption recipients,
+Drive destination and other settings; give the operator the exact app entry to add
+when working through a manual deployment. Run `backups/backup.sh check` on the VPS
+after the app's database and storage are ready, and verify its first backup.
+
+`phnx-solution` is intentionally excluded from app backups at the user's request.
+Its deployment remains in this repository; do not add it back to the backup list
+unless the user changes that decision. The backup `apps` mapping selects which
+apps to capture. Every non-system MySQL database must still map to one selected
+app, so excluding a database-backed app needs a separate recovery/coverage decision.
+
 `templates/{laravel,nuxt,spa}/` are file **sources** the skill copies and customises —
 not a plan. Copying them verbatim is how you get a Node-only frontend stage that can't
 build a Wayfinder app, or an image with `public/hot` in it. The `init.sh` scripts that
@@ -163,7 +178,8 @@ bash /opt/infrastructure/scripts/verify-migration.sh
 `backups/install.sh --restore-tested` after configuration and a real restore test to
 enable daily 03:00 Europe/Belgrade backups and hourly upload/health systemd timers.
 It captures each app online, keeps two complete local sets and every uploaded set
-in Drive (year/month/day/run/app). Redis and shared infrastructure are excluded.
+in Drive (year/month/day/run/app). Only apps listed in the backup configuration are
+captured. `phnx-solution`, Redis and shared infrastructure are excluded.
 Restores stop only the selected app's services/workers and leave them stopped on
 partial failure. Never use the whole-VPS migration unpack script for a single-app
 rollback. App `.env` may be archived by the runtime on the VPS; never read protected

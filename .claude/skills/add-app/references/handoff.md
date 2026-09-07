@@ -21,7 +21,7 @@ Pushing the app repo triggers a build **and a deploy**. Everything the deploy to
 to exist first:
 
 ```
-infra push → VPS pull → storage skeleton → DB → .env → secrets → app push → DNS
+infra push → VPS pull → storage skeleton → DB → .env → backup config + preflight → secrets → app push → DNS
 ```
 
 Get this backwards and the deploy fails on a missing `apps/<name>` directory.
@@ -32,8 +32,8 @@ Get this backwards and the deploy fails on a missing `apps/<name>` directory.
 cd <infra repo> && git push
 ```
 
-Claude cannot do this — the user's SSH key isn't in the session's agent. Say so rather
-than trying and reporting a confusing failure.
+Use the session's available Git authentication and existing authorization. If pushing
+is not available or the user is performing deployment manually, hand over this step.
 
 ## 2. VPS prep
 
@@ -98,6 +98,20 @@ FLUSH PRIVILEGES;
 
 Then write `.env` — see `references/env-contract.md` for the file and the traps.
 
+**Backup registration is part of VPS prep.** Follow `references/backups.md`: merge the
+new app entry into `/etc/infrastructure-backup/config.json` without replacing the
+existing encryption recipient, Drive destination, credentials, or other settings.
+Pulling the repository does not update that file. Once the app's Compose environment,
+storage, and database are ready, run:
+
+```bash
+sudo /opt/infrastructure/backups/backup.sh check
+```
+
+Confirm the new app appears with the expected database and numeric owner. For an
+explicit exclusion, document the user's decision and confirm preflight still passes.
+If this step is handed to the user, mark coverage as pending until its result is known.
+
 ## 3. Secrets
 
 All five, on the app repo. Check first — they may already exist:
@@ -125,7 +139,7 @@ the newline without printing key material:
 [ -n "$(tail -c1 ~/.ssh/<key>)" ] && echo "MISSING trailing newline" || echo "newline ok"
 ```
 
-**`GHCR_PAT` is the user's to run, not Claude's.** It reads stdin, and with no TTY the
+**`GHCR_PAT` is the user's to run interactively.** It reads stdin, and with no TTY the
 call stores an **empty secret and reports success** — the deploy then fails `unauthorized`
 and the decoder below sends you hunting a `read:packages` scope that was never the
 problem. Hand it over:
@@ -177,6 +191,10 @@ curl -sI https://<domain> | head -1
 `php artisan about` is the one that matters — it catches the whole silent-default class
 in a single call. A restarting `worker` almost always means the cache driver is wrong.
 
+For an included app, finish the backup checks from `references/backups.md`: preflight
+plus a successful uploaded set listing the app. Report the actual result or the exact
+pending commands, rather than treating a template entry as verified protection.
+
 ## Deploy failure decoder
 
 | Symptom | Cause |
@@ -214,6 +232,12 @@ No scheduler: <the evidence — no Schedule:: anywhere>.
 
 ## First boot
 <storage skeleton, DB, DNS>
+
+## Backups
+<included, or explicitly excluded by the user and why>
+<database mapping, storage path, verified numeric UID:GID>
+<template registration and VPS config update: complete or pending>
+<preflight result and first uploaded run ID, or exact pending verification commands>
 
 ## Quirks
 <what this app does that the template doesn't expect, and why>

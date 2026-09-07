@@ -1,6 +1,6 @@
 # App backups and recovery
 
-The backup system captures app databases, `storage/` files and app-specific configuration while apps and workers stay online. It excludes shared infrastructure, Redis, Uptime Kuma, infrastructure secrets/certificates, app logs and rebuildable Laravel caches. It never restores Redis.
+The backup system captures the configured apps' databases, `storage/` files and app-specific configuration while apps and workers stay online. It excludes shared infrastructure, Redis, Uptime Kuma, infrastructure secrets/certificates, app logs and rebuildable Laravel caches. It never restores Redis. `phnx-solution` is intentionally excluded from the backup app list at the user's request; its deployment remains in this repository.
 
 Every successful run produces one independent `.tar.gz.age` archive per app and immediately uploads the whole set to Google Drive. The newest **two complete sets** remain on the VPS. Older local sets are removed only after verifying their remote copy. Pending uploads and restore safety archives are never automatically deleted. **There is no Drive deletion, synchronization or retention job.**
 
@@ -46,7 +46,9 @@ sudo install -m 600 /opt/infrastructure/backups/config.example.json \
   /etc/infrastructure-backup/config.json
 ```
 
-Edit `/etc/infrastructure-backup/config.json`: set the public recipient, remote name/path, server label and app overrides. The app database is discovered from Compose's resolved `DB_DATABASE`, `DB_NAME` or MySQL `DATABASE_URL` environment, without printing secrets. Explicit `database` overrides accept a name or `null`. Every non-system MySQL database must map to exactly one app; unmapped/shared databases fail preflight. An app without a database still gets its storage/config archive.
+Edit `/etc/infrastructure-backup/config.json`: set the public recipient, remote name/path, server label and selected apps. The `apps` mapping is a required, nonempty inclusion list: only listed apps are captured, and a listed app must have an existing Compose file. Removing an app from this mapping excludes it; new app directories are not automatically included. The app database is discovered from Compose's resolved `DB_DATABASE`, `DB_NAME` or MySQL `DATABASE_URL` environment, without printing secrets. Explicit `database` overrides accept a name or `null`. Every non-system MySQL database must map to exactly one selected app; unmapped/shared databases fail preflight. An included app without a database still gets its storage/config archive. Omitting a database-backed app does not bypass database coverage checks.
+
+When adding a project, add its entry to both `backups/config.example.json` and the active VPS configuration, or ask the user for a backup decision and document any explicit exclusion in the app's README. Preserve the active configuration's recipients, Drive destination and other settings. A Git pull only updates the template; it does not change `/etc/infrastructure-backup/config.json`. After provisioning the app's database and storage, run `backups/backup.sh check` and verify that the first uploaded set contains the new app.
 
 Owners default to `82:82` for Laravel and `1000:1000` for Node. The example pins owners for current apps. These numeric IDs are used for restored storage, never a username inferred from the host. `config_files` defaults to `.env`, `docker-compose.yml`, and `nginx.conf` if present; optional `excludes` extend the built-in storage exclusions.
 

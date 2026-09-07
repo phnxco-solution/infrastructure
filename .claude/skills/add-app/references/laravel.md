@@ -1,7 +1,6 @@
 # Laravel apps
 
-Source files: `templates/laravel/`. Worked example: `apps/buduci-klasici/` +
-the buduci-klasici repo (commits `7cb7a43`, `4f22064`).
+Source files: `<infra>/templates/laravel/`.
 
 ## What goes where
 

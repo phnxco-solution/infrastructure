@@ -160,9 +160,8 @@ the app fell back and everything after it is meaningless — that is the exact f
 stack exists to make impossible. Don't `grep | head` it: truncating past the row you came
 for is how you get a green check that checked nothing.
 
-Seed if the app's pages need data. An empty database renders a page that's technically 200
-and proves very little (`apps/buduci-klasici`'s home page reads opening hours; with none,
-there's nothing to look at).
+Seed if the app's pages need data. An empty database can render a page that's technically
+200 while leaving its actual content empty, such as opening hours or product listings.
 
 ## 4. Probe
 
@@ -193,12 +192,12 @@ the app image. It must report the forwarded client IP, `isSecure: true` and
 probe report a failure that isn't real. It aborts rather than lie. `APP_KEY` isn't needed
 (signing and verification use the same key, whatever it is).
 
-The script lives in the **infra** repo, not the app repo, so mount it by absolute path.
+The script lives in the **loaded skill directory**, so mount it by absolute path.
 `$PWD` here is the app repo, and Docker will silently create an empty *directory* for a
 bind-mount source that doesn't exist, giving you a baffling "Could not open input file":
 
 ```bash
-SKILL=<infra-repo>/.claude/skills/add-app          # absolute
+SKILL=<absolute-path-to-loaded-add-app-skill>
 docker run --rm -e APP_URL=https://<domain> \
   -v "$SKILL/scripts/probe-proxy.php:/tmp/probe.php:ro" \
   "$V-production" php /tmp/probe.php
