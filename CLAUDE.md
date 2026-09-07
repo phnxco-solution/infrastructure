@@ -2,6 +2,9 @@
 
 Shared Docker infrastructure for all apps on a Hostinger VPS (4GB RAM / 2 CPU).
 
+**Agent instructions:** `AGENTS.md` must contain only the single line `@CLAUDE.md`.
+Do not edit `AGENTS.md`; maintain all repository instructions in this file.
+
 ## Stack
 
 - **Traefik v3.6** — reverse proxy, auto-discovers containers via Docker labels
@@ -93,6 +96,10 @@ Traefik dashboard: traefik.phnx-solution.com
 **Use the `add-app` skill** (`/add-app`, or just ask to add a new app). It detects what
 the app actually needs, scaffolds both repos, verifies the stack locally, commits, and
 hands back the manual steps and `gh` commands.
+
+Codex uses `$add-app` through `.agents/skills/add-app`, which links to the canonical
+`.claude/skills/add-app` directory. Edit the canonical skill so both agents share
+the same workflow and references.
 
 **Backups are part of onboarding.** Add every new app to the `apps` mapping in
 `backups/config.example.json` and the VPS's `/etc/infrastructure-backup/config.json`,
