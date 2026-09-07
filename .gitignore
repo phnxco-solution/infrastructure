@@ -1,4 +1,5 @@
 .env
+/.playwright-mcp/
 traefik/certs/*
 !traefik/certs/.gitkeep
 /backups/__pycache__/
