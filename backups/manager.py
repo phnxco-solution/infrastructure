@@ -940,36 +940,169 @@ class Manager:
                 shutil.rmtree(replacement)
 
 
+COMMAND_HELP = {
+    "run": "Capture the configured apps online, upload to Drive and prune verified local sets",
+    "upload": "Retry uploading complete local sets to Drive",
+    "check": "Check configuration, database coverage, encryption, Drive access and free space",
+    "health": "Check backup age, the latest Drive copy and storage capacity",
+    "list": "List complete backup sets and their run IDs",
+    "download": "Download one encrypted app archive into a new file",
+    "unpack": "Decrypt and verify an archive into a new directory; live app data stays unchanged",
+    "restore": "Replace one app's database and storage, with an interactive confirmation",
+}
+
+HELP_OVERVIEW = """Recovery commands (on the VPS, as root):
+  cd /opt/infrastructure
+  ./backups/backup.sh list --source drive --app voucher-tracker
+  ./backups/backup.sh help restore
+  ./backups/backup.sh help unpack
+
+Use 'help COMMAND' or 'COMMAND --help' for options and examples.
+Running backup.sh without a command creates and uploads a backup.
+Full operational guide: /opt/infrastructure/backups/README.md
+"""
+
+RECOVERY_KEY_HELP = """Recovery key:
+  --identity must point to the private age recovery key, not the age1 public value.
+  Keep your master copy outside the VPS; transfer a temporary copy for recovery.
+
+  On your Mac, replace VPS_IP with the server address:
+    ssh -p 41922 deploy@VPS_IP 'install -d -m 700 /home/deploy/backup-recovery'
+    scp -P 41922 "$HOME/.config/infrastructure-backup/recovery-key.txt" deploy@VPS_IP:/home/deploy/backup-recovery/recovery-key.txt
+
+  On the VPS as root, prepare the private key path used by these examples:
+    install -d -m 700 /run/infrastructure-backup
+    install -o root -g root -m 600 /home/deploy/backup-recovery/recovery-key.txt /run/infrastructure-backup/recovery-key.txt
+    rm /home/deploy/backup-recovery/recovery-key.txt
+
+  After checking the recovered app/files, remove only the temporary VPS copy:
+    rm /run/infrastructure-backup/recovery-key.txt
+  Keep your original key and independent recovery copy.
+"""
+
+COMMAND_EXAMPLES = {
+    "list": """Examples (on the VPS, as root, from /opt/infrastructure):
+  ./backups/backup.sh list --app voucher-tracker
+  ./backups/backup.sh list --source drive --app voucher-tracker
+  ./backups/backup.sh list --source drive --date 2026-09-07
+
+Copy a run ID from the output when selecting a particular backup.
+""",
+    "download": """Example (on the VPS, as root, from /opt/infrastructure):
+  ./backups/backup.sh download --source drive --app voucher-tracker --run RUN_ID --to /root/voucher-tracker.tar.gz.age
+
+Replace RUN_ID with a run ID from 'list'. Omitting --run selects the latest
+matching backup. The destination parent must exist and have no symlinks; the
+destination file must be new. Download leaves the archive encrypted.
+""",
+    "unpack": """Examples (from /opt/infrastructure; use root on the VPS):
+  # A file downloaded from Drive or transferred manually:
+  ./backups/backup.sh unpack --file /root/voucher-tracker.tar.gz.age --identity /run/infrastructure-backup/recovery-key.txt --to /root/recovered-voucher-tracker
+
+  # Download from Drive, decrypt, verify and unpack in one command:
+  ./backups/backup.sh unpack --source drive --app voucher-tracker --run RUN_ID --identity /run/infrastructure-backup/recovery-key.txt --to /root/recovered-voucher-tracker
+
+Replace RUN_ID with a run ID from 'list'. For a local backup set, use
+--source local. The destination parent must exist and have no symlinks; the
+destination directory must be new. Unpack never stops or restores the live app.
+An independent --file can be unpacked on your computer without VPS configuration
+or Google authorization; adjust the archive, key and output paths accordingly.
+
+""" + RECOVERY_KEY_HELP,
+    "restore": """Restore an existing app (on the VPS, as root):
+  cd /opt/infrastructure
+
+  # 1. Find the backup. Change voucher-tracker to your app's name.
+  ./backups/backup.sh list --source drive --app voucher-tracker
+
+  # 2. Replace RUN_ID with the chosen ID. Verify without changing live data.
+  ./backups/backup.sh restore --source drive --app voucher-tracker --run RUN_ID --identity /run/infrastructure-backup/recovery-key.txt --verify-only
+
+  # 3. Apply the same backup after reviewing the plan.
+  ./backups/backup.sh restore --source drive --app voucher-tracker --run RUN_ID --identity /run/infrastructure-backup/recovery-key.txt
+
+Other sources:
+  # Latest local backup for this app; add --run RUN_ID to select an older one:
+  ./backups/backup.sh restore --app voucher-tracker --identity /run/infrastructure-backup/recovery-key.txt
+
+  # A standalone encrypted archive, including a restore safety archive:
+  ./backups/backup.sh restore --app voucher-tracker --file /root/voucher-tracker.tar.gz.age --identity /run/infrastructure-backup/recovery-key.txt
+
+The app and its database account must already be provisioned on this server.
+--source drive downloads the archive automatically. --source local is the default.
+--verify-only validates the archive and target; it does not perform a restore.
+
+When applying, type RESTORE voucher-tracker (or RESTORE followed by your app name).
+The command stops that app's services/workers, makes an encrypted safety backup,
+replaces its database and storage, then restarts previously active services and
+checks their health. Current app configuration is preserved by default.
+Redis and other apps stay unchanged. Review the app's current queued work before
+rolling its database back. Backups contain data/configuration, not Docker images.
+
+If image IDs differ, review the code version/compatibility before using
+--allow-image-mismatch. --with-config also restores app configuration and requires
+the archived deployment topology and database connection to match the target.
+
+If applying the data or checking health fails, the app is left stopped. Inspect
+the phase journal and safety archive under backup_root/safety (default:
+/opt/backups/apps/safety). Keep those files until recovery is verified.
+
+""" + RECOVERY_KEY_HELP,
+}
+
+
 def parser():
-    cli = argparse.ArgumentParser(description=__doc__)
-    cli.add_argument("--config", default=DEFAULT_CONFIG)
+    cli = argparse.ArgumentParser(
+        prog="backup.sh", description="Encrypted app backups, Google Drive copies and app recovery.",
+        epilog=HELP_OVERVIEW, formatter_class=argparse.RawDescriptionHelpFormatter)
+    cli.add_argument("--config", default=DEFAULT_CONFIG,
+                     help=f"Backup configuration file (default: {DEFAULT_CONFIG})")
     commands = cli.add_subparsers(dest="command", required=True)
-    for name in ("run", "upload", "check", "health", "list", "download", "unpack", "restore"):
-        p = commands.add_parser(name)
-        p.add_argument("--config", default=argparse.SUPPRESS)
+    for name, description in COMMAND_HELP.items():
+        p = commands.add_parser(name, help=description, description=description,
+                                epilog=COMMAND_EXAMPLES.get(name),
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+        p.add_argument("--config", default=argparse.SUPPRESS,
+                       help=f"Backup configuration file (default: {DEFAULT_CONFIG})")
         if name in ("list", "download", "unpack", "restore"):
-            p.add_argument("--source", choices=("local", "drive"), default="local")
-            p.add_argument("--app")
-            p.add_argument("--run", default="latest" if name != "list" else None)
+            p.add_argument("--source", choices=("local", "drive"), default="local",
+                           help="Where to find backup sets (default: local)")
+            p.add_argument("--app", help="Only list sets containing this app" if name == "list" else
+                           "App name (required unless unpacking a standalone --file)")
+            p.add_argument("--run", default="latest" if name != "list" else None,
+                           help="Filter by exact run ID (default: all runs)" if name == "list" else
+                           "Exact run ID or latest (default: latest complete backup containing this app)")
         if name == "list":
             p.add_argument("--date", help="YYYY-MM-DD in Europe/Belgrade")
         if name in ("unpack", "restore"):
-            p.add_argument("--file")
-            p.add_argument("--identity", default=os.environ.get("BACKUP_IDENTITY_FILE"))
+            p.add_argument("--file", help="Use a standalone encrypted archive instead of selecting a backup set")
+            p.add_argument("--identity", default=os.environ.get("BACKUP_IDENTITY_FILE"),
+                           help="Private age recovery key file (default: BACKUP_IDENTITY_FILE environment variable)")
         if name == "download":
             p.set_defaults(file=None)
         if name in ("download", "unpack"):
-            p.add_argument("--to", required=True)
+            p.add_argument("--to", required=True,
+                           help="New destination file (download) or directory (unpack); parent must already exist")
         if name == "restore":
-            p.add_argument("--with-config", action="store_true")
-            p.add_argument("--allow-image-mismatch", action="store_true")
-            p.add_argument("--verify-only", action="store_true")
+            p.add_argument("--with-config", action="store_true",
+                           help="Also apply archived app configuration after checking deployment compatibility")
+            p.add_argument("--allow-image-mismatch", action="store_true",
+                           help="Accept different image IDs only after reviewing code/schema compatibility")
+            p.add_argument("--verify-only", action="store_true",
+                           help="Verify archive and target without stopping services or changing live data")
+    help_command = commands.add_parser("help", help="Show command help and recovery examples")
+    help_command.add_argument("topic", nargs="?", choices=tuple(COMMAND_HELP),
+                              help="Command to explain, for example: help restore")
     return cli
 
 
 def main(argv=None):
     os.umask(0o077)
-    args = parser().parse_args(argv)
+    cli = parser()
+    args = cli.parse_args(argv)
+    if args.command == "help":
+        # Help must work without configuration, credentials, root or live services.
+        cli.parse_args([args.topic, "--help"] if args.topic else ["--help"])
     manager = None
     try:
         config_path = Path(args.config)

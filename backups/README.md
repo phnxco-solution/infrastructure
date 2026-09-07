@@ -66,6 +66,100 @@ sudo ./backups/backup.sh health
 6. Download and unpack a real Drive archive. On a disposable test server, perform an actual database/file restoration and application check. `restore --verify-only` validates the archive and target but does **not** prove SQL imports or that the app works. Do not activate the timers until that recovery test passes.
 7. Activate with `sudo ./backups/install.sh --restore-tested`. The installer validates configuration and current backup health, then installs, verifies and enables the backup, upload retry and health timers. Run `scripts/verify-setup.sh` to check that all three timers are enabled and active.
 
+## Help and a recovery walkthrough
+
+These commands display help without accessing configuration, credentials, Docker
+or app data. They also work before the VPS backup system has been configured:
+
+```bash
+/opt/infrastructure/backups/backup.sh help
+/opt/infrastructure/backups/backup.sh help restore
+/opt/infrastructure/backups/backup.sh help unpack
+```
+
+`--help` and `restore --help` display the same help as `help` and `help restore`.
+The restore guide includes examples for local sets, Google Drive and standalone
+archives. Run the recovery commands below only when you intend to recover an app.
+They use `voucher-tracker` as an example; substitute your selected app.
+
+### Temporarily provide the recovery key
+
+The VPS keeps the public encryption recipient. Restoring needs your **private age
+recovery key** from your computer/password manager. Keep the master copy outside
+the VPS; transfer a temporary copy when recovery is needed.
+
+On your Mac, replace `VPS_IP` with the VPS address. These are single-line commands;
+use the `deploy` account because root SSH login is disabled:
+
+```bash
+ssh -p 41922 deploy@VPS_IP 'install -d -m 700 /home/deploy/backup-recovery'
+scp -P 41922 "$HOME/.config/infrastructure-backup/recovery-key.txt" deploy@VPS_IP:/home/deploy/backup-recovery/recovery-key.txt
+```
+
+On the VPS **as root**, move the temporary key into private runtime storage:
+
+```bash
+install -d -m 700 /run/infrastructure-backup
+install -o root -g root -m 600 /home/deploy/backup-recovery/recovery-key.txt /run/infrastructure-backup/recovery-key.txt
+rm /home/deploy/backup-recovery/recovery-key.txt
+```
+
+### Choose, verify and restore one backup
+
+On the VPS as root, list backups and copy the exact run ID you want:
+
+```bash
+cd /opt/infrastructure
+./backups/backup.sh list --source drive --app voucher-tracker
+```
+
+Replace `RUN_ID` below with that ID. First check the archive and target without
+stopping services or changing live data:
+
+```bash
+./backups/backup.sh restore --source drive --app voucher-tracker --run RUN_ID --identity /run/infrastructure-backup/recovery-key.txt --verify-only
+```
+
+Then apply the **same run ID**, review the displayed plan, and type
+`RESTORE voucher-tracker` when prompted:
+
+```bash
+./backups/backup.sh restore --source drive --app voucher-tracker --run RUN_ID --identity /run/infrastructure-backup/recovery-key.txt
+```
+
+The command downloads from Drive automatically. Use `--source local` in both
+listing and restore commands to select a backup already on the VPS. Omitting
+`--run` chooses the newest complete backup containing the app in that source;
+an exact ID keeps verification and application tied to the same backup.
+
+For an encrypted archive you downloaded or uploaded manually, use `--file`
+instead of Drive/run selection:
+
+```bash
+./backups/backup.sh restore --app voucher-tracker --file /root/voucher-tracker.tar.gz.age --identity /run/infrastructure-backup/recovery-key.txt --verify-only
+./backups/backup.sh restore --app voucher-tracker --file /root/voucher-tracker.tar.gz.age --identity /run/infrastructure-backup/recovery-key.txt
+```
+
+To extract files for inspection without applying a restore, use `unpack` with a
+new output directory instead:
+
+```bash
+./backups/backup.sh unpack --file /root/voucher-tracker.tar.gz.age --identity /run/infrastructure-backup/recovery-key.txt --to /root/recovered-voucher-tracker
+```
+
+After recovery, check the app itself. The CLI checks service health; application
+checks should also cover login, database content and uploads. Remove the temporary
+VPS key when finished, keeping your master and independent recovery copies:
+
+```bash
+rm /run/infrastructure-backup/recovery-key.txt
+```
+
+The app and its database account must already exist on the target server. A full
+replacement VPS must be provisioned first; these are app backups. See **Applying
+a restore** below for service shutdown, safety archives, configuration recovery
+and failure handling.
+
 ## Commands
 
 All commands accept `--config /path/to/config.json`. Local is the default source. Use `list` to copy the exact run ID; omitted `--run` means `latest` for download/unpack/restore. `list` can filter `--date YYYY-MM-DD` and `--app NAME`.
