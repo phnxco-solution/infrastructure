@@ -16,6 +16,7 @@
     "endlessly": {"database": "auto", "owner": [1000, 1000]},
     "demo-endlessly": {"database": "auto", "owner": [1000, 1000]},
     "blogmana": {"database": "auto", "owner": [1000, 1000]},
-    "voucher-tracker": {"database": "auto", "owner": [1000, 1000]}
+    "voucher-tracker": {"database": "auto", "owner": [1000, 1000]},
+    "gift-site-landing": {"database": null, "owner": [1000, 1000]}
   }
 }

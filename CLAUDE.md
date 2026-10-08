@@ -87,6 +87,7 @@ Two Docker networks:
 | blogmana | mana.phnx-solution.com | Nuxt SSR |
 | unimaginable | unimaginable.rs + api.unimaginable.rs (separate CF zone) | Laravel 12 (API + landing) |
 | voucher-tracker | voucher-tracker.phnx-solution.com | Nuxt 4 SSR + MySQL (Drizzle) |
+| gift-site-landing | pokloni-sajt.phnx-solution.com | Node 22 static site + Gmail inquiry form (no DB) |
 | uptime-kuma | status.phnx-solution.com | Uptime monitoring |
 
 Traefik dashboard: traefik.phnx-solution.com
