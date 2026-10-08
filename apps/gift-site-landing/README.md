@@ -60,11 +60,11 @@ Included, with `database: null` and owner `[1000, 1000]` (the `node` user, check
 archive's value is the app configuration (`.env` with the Gmail app password).
 
 - Template: `backups/config.example.json` registers `gift-site-landing`.
-- VPS: merge `"gift-site-landing": {"database": null, "owner": [1000, 1000]}` into
-  `/etc/infrastructure-backup/config.json`. **Pending** until done on the server.
-- Then `sudo /opt/infrastructure/backups/backup.sh check`, and after the next run,
+- VPS: `"gift-site-landing": {"database": null, "owner": [1000, 1000]}` merged into
+  `/etc/infrastructure-backup/config.json` on 2026-10-08.
+- Preflight passed 2026-10-08: `gift-site-landing: database=(none), owner=[1000, 1000]`.
+- First uploaded run: **pending**. Confirm after the next 03:00 run with
   `sudo /opt/infrastructure/backups/backup.sh list --source drive --app gift-site-landing`.
-  **Pending**, no uploaded run recorded yet.
 
 ## Quirks
 
