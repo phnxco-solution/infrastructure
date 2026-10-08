@@ -1,0 +1,40 @@
+name: endlessly-landing
+
+services:
+  # Named 'web' for consistency with the other Node/SPA projects. NOTE: the service name
+  # is a DNS alias on traefik-public and is NOT unique — several projects publish 'web',
+  # several publish 'nginx', and resolving either round-robins across all of them. Never
+  # address another project by service name; use the container name (<project>-<service>-1),
+  # which is unique.
+  web:
+    image: ghcr.io/phnxco-solution/endlessly-landing:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    volumes:
+      - /opt/volumes/apps/endlessly-landing/logs:/app/logs
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.endlessly-landing.rule=Host(`sajt-za-dvoje.phnx-solution.com`)"
+      - "traefik.http.routers.endlessly-landing.entrypoints=websecure"
+      - "traefik.http.routers.endlessly-landing.tls=true"
+      - "traefik.http.services.endlessly-landing.loadbalancer.server.port=3000"
+      - "traefik.http.services.endlessly-landing.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.endlessly-landing.loadbalancer.healthcheck.interval=15s"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/ || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+networks:
+  traefik-public:
+    external: true
