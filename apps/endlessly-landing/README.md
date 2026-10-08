@@ -68,10 +68,12 @@ Included, with `database: null` and owner `[1000, 1000]` (the `node` user, check
 archive's value is the app configuration (`.env` with the Gmail app password).
 
 - Template: `backups/config.example.json` registers `endlessly-landing`.
-- VPS: `"endlessly-landing": {"database": null, "owner": [1000, 1000]}` to be merged
-  into `/etc/infrastructure-backup/config.json`: **pending**.
-- Preflight: **pending**. `sudo /opt/infrastructure/backups/backup.sh check`.
-- First uploaded run: **pending**. Confirm with
+- VPS: `"endlessly-landing": {"database": null, "owner": [1000, 1000]}` merged into
+  `/etc/infrastructure-backup/config.json` on 2026-10-08.
+- Preflight passed 2026-10-08: `endlessly-landing: database=(none), owner=[1000, 1000]`.
+  It needs `.env` in place first: `docker compose config` refuses a missing `env_file`,
+  and the check reports only `docker failed (exit 1)`.
+- First uploaded run: **pending**. Confirm after the next 03:00 run with
   `sudo /opt/infrastructure/backups/backup.sh list --source drive --app endlessly-landing`.
 
 ## Quirks
