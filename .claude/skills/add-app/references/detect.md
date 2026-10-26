@@ -99,7 +99,7 @@ an image is a production bug:
 | **Does the Vite build need PHP?** | `grep -n "wayfinder\|laravel-vue-i18n" vite.config.*` | Any hit → the Node-only frontend stage **cannot build this app**. See `references/laravel.md`. |
 | **Cross-check** | does the app's CI run `composer install` before `npm run build`? | If yes, the Docker build must too. Decisive tell. |
 | **Inertia SSR?** | `grep -n "'enabled'" config/inertia.php`; `grep -n "build:ssr" package.json` | Enabled + a build:ssr script → SSR is on the table. Read the SSR contract in `references/laravel.md` before promising it. |
-| **trustProxies?** | `grep -n "trustProxies" bootstrap/app.php` | **Missing → signed URLs 403 and rate limiters key on Traefik's IP.** Applies to every Laravel app here. Prove it in Phase 4 with this skill's `scripts/probe-proxy.php` (invocation in `references/verify.md` — note the infra repo has its own unrelated top-level `scripts/`). |
+| **trustProxies?** | `grep -n "trustProxies" bootstrap/app.php` | **Missing → signed URLs 403 and rate limiters key on Traefik's IP. `at: '*'` → the visitor chooses their own IP.** Either way, use the address list in `references/laravel.md`. Applies to every Laravel app here. Prove it in Phase 4 with this skill's `scripts/probe-proxy.php` (invocation in `references/verify.md`; note the infra repo has its own unrelated top-level `scripts/`). |
 | **Health path** | `grep -n "health:" bootstrap/app.php` | Laravel's own endpoint (usually `/up`). The template's Traefik check uses nginx's `/health` — either is fine, be deliberate. |
 | **Uploads?** | `grep -rn "Storage::\|->store(" app/` | No hits → nothing writes to `storage/app/public`, but the storage volume is still needed for **logs**. |
 

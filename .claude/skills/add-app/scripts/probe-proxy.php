@@ -3,10 +3,13 @@
 /**
  * Proves how a Laravel app behaves behind Traefik, without needing Traefik.
  *
- * TLS terminates at Traefik and reaches php-fpm as plain http. Laravel trusts no proxies
- * unless bootstrap/app.php says so, and the resulting breakage is invisible locally and
- * in CI — it only appears once deployed: signed links in emails 403, and IP rate limiters
- * key every visitor to Traefik's address.
+ * A request arrives as visitor -> Cloudflare -> Traefik -> nginx -> php-fpm, over plain http.
+ * Traefik keeps the X-Forwarded-For Cloudflare sent and appends Cloudflare's edge address,
+ * so PHP sees REMOTE_ADDR = Traefik and X-Forwarded-For = "<anything the visitor typed>,
+ * <visitor>, <Cloudflare edge>". Laravel has to trust Traefik and Cloudflare by address, and
+ * only X-Forwarded-For and X-Forwarded-Proto. Get it wrong and nothing breaks locally or in
+ * CI, only once deployed: signed links in emails 403, and IP rate limiters key every visitor
+ * to Traefik, to a Cloudflare edge, or to whatever address the visitor chose to send.
  *
  * Run inside the app's production image:
  *
@@ -23,7 +26,7 @@
  *
  * Exit codes:
  *   0  PASS — proxy headers are trusted
- *   1  FAIL — the app does not trust Traefik; add trustProxies(at: '*')
+ *   1  FAIL: the app's trusted proxies are wrong; see "Trusted proxies" in references/laravel.md
  *   2  ABORT — the probe could not run (bad APP_URL, unbootable app). NOT a verdict.
  */
 
@@ -34,7 +37,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 
+const SPOOFED     = '6.6.6.6';       // what a visitor can put in X-Forwarded-For
 const REAL_CLIENT = '93.87.10.55';   // the customer
+const EDGE_IP     = '162.158.1.1';   // the Cloudflare edge that Traefik appends
 const PROXY_IP    = '172.18.0.4';    // the traefik container
 
 function abort_probe(string $message): never
@@ -91,14 +96,14 @@ function trust_proxies_middleware(): ?TrustProxies
     return null;
 }
 
-/** Build a request shaped exactly like Traefik -> nginx -> fpm delivers one. */
-function forwarded(string $url): Request
+/** Build a request shaped exactly like Cloudflare -> Traefik -> nginx -> fpm delivers one. */
+function forwarded(string $url, ?string $forwardedHost = null): Request
 {
     $request = Request::create($url, 'GET');
     $request->server->set('REMOTE_ADDR', PROXY_IP);
-    $request->headers->set('X-Forwarded-For', REAL_CLIENT);
+    $request->headers->set('X-Forwarded-For', SPOOFED.', '.REAL_CLIENT.', '.EDGE_IP);
     $request->headers->set('X-Forwarded-Proto', 'https');
-    $request->headers->set('X-Forwarded-Host', parse_url($url, PHP_URL_HOST));
+    $request->headers->set('X-Forwarded-Host', $forwardedHost ?? parse_url($url, PHP_URL_HOST));
 
     trust_proxies_middleware()?->handle($request, fn ($r) => null);
 
@@ -111,6 +116,11 @@ $request = forwarded("http://{$host}/");
 $results[] = ['client IP surfaces', $request->ip() === REAL_CLIENT, $request->ip()];
 $results[] = ['isSecure()', $request->isSecure() === true, var_export($request->isSecure(), true)];
 $results[] = ['url() scheme', str_starts_with($request->url(), 'https://'), $request->url()];
+
+// A visitor can send X-Forwarded-Host through Cloudflare; trusting it lets them pick the host
+// every absolute URL in that request is built from.
+$request = forwarded("http://{$host}/", 'evil.example');
+$results[] = ['forwarded host ignored', $request->getHost() === $host, $request->getHost()];
 
 // Signed URLs: the failure that kills emailed links. Generated from APP_URL (https, in a
 // queued Mailable), verified against the inbound request's rebuilt URL.
@@ -155,9 +165,9 @@ foreach ($results as [$label, $ok, $detail]) {
 }
 
 if ($failed) {
-    echo PHP_EOL, 'FAILED: this app does not trust Traefik.', PHP_EOL,
-         'Signed links from emails will 403 and IP rate limiters will share one bucket.', PHP_EOL,
-         "Add to bootstrap/app.php withMiddleware():  \$middleware->trustProxies(at: '*');", PHP_EOL;
+    echo PHP_EOL, "FAILED: this app's trusted proxies are wrong.", PHP_EOL,
+         'Visitor IPs, https URLs or signed links will be wrong behind Cloudflare and Traefik.', PHP_EOL,
+         'Trust Traefik and Cloudflare by address, never with \'*\': see "Trusted proxies" in references/laravel.md.', PHP_EOL;
     exit(1);
 }
 

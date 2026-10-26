@@ -143,27 +143,50 @@ Place `ARG`/`ENV` after `npm ci` so changing the name doesn't bust the dependenc
 Vite's `loadEnv` merges prefix-matching `process.env` keys, so `ENV` is enough. Grep for
 every `import.meta.env.VITE_*` in Phase 0 and give each one a build arg.
 
-## Trusted proxies — applies to every Laravel app here
+## Trusted proxies: applies to every Laravel app here
 
-TLS terminates at Traefik and reaches php-fpm as plain http. Laravel trusts no proxies
-unless told to, so `bootstrap/app.php` **must** contain:
+A request reaches php-fpm as visitor, Cloudflare, Traefik, nginx, over plain http. Traefik
+trusts Cloudflare (`forwardedHeaders.trustedIPs` in `traefik/traefik.yml`), keeps the
+`X-Forwarded-For` Cloudflare sent and appends Cloudflare's edge address. So PHP sees
+`REMOTE_ADDR` = Traefik and `X-Forwarded-For: <anything the visitor typed>, <visitor>,
+<Cloudflare edge>`. Laravel has to trust both hops by address, and only the two headers it
+needs. `bootstrap/app.php` **must** contain:
 
 ```php
-$middleware->trustProxies(at: '*');
+$middleware->trustProxies(
+    at: [
+        // Traefik reaches the app over a Docker network.
+        '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16',
+        // Cloudflare's edge, which Traefik appends to X-Forwarded-For (www.cloudflare.com/ips).
+        // Copy every range from traefik/traefik.yml and keep them in step with it.
+        '173.245.48.0/20', '103.21.244.0/22', /* ... */ '2c0f:f248::/32',
+    ],
+    headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_PROTO,
+);
 ```
 
-Without it — verified by this skill's `scripts/probe-proxy.php`, run per
+Never `at: '*'`. Laravel 13 then trusts every address, so `$request->ip()` becomes the
+leftmost `X-Forwarded-For` entry, which the visitor types, and a forwarded host the visitor
+sends is believed too: rate limits, audit IPs and absolute URLs are theirs to choose.
+`at: '*'` with only `HEADER_X_FORWARDED_PROTO` is safe but gives every visitor Traefik's
+address, unless nginx resolves the visitor first: unimaginable's nginx does, with
+`set_real_ip_from` Docker's ranges and `real_ip_header CF-Connecting-IP`, which is also correct.
+probe-proxy.php can't see nginx, so it reports that setup as a FAIL. Never trust the forwarded
+host or port: a visitor can send both through Cloudflare.
+
+Missing or wrong, verified by this skill's `scripts/probe-proxy.php`, run per
 `references/verify.md`:
 
-- `$request->ip()` returns Traefik's container IP → every IP-keyed rate limiter shares
-  one bucket site-wide, so a throttle meant as spam defence locks out real users
-- `$request->isSecure()` is false → `$request->url()` is `http://`
+- `$request->ip()` is Traefik's container IP or a Cloudflare edge, so every IP-keyed rate
+  limiter shares one bucket and a throttle meant as spam defence locks out real users; with
+  `'*'` it is whatever the visitor sends, so the throttles don't hold at all
+- `$request->isSecure()` is false, so `$request->url()` is `http://`
 - **signed URLs 403**: `URL::signedRoute()` signs `https://` (from `APP_URL`, in a
-  queued Mailable), `hasValidSignature()` rebuilds `http://` → mismatch. Every emailed
+  queued Mailable), `hasValidSignature()` rebuilds `http://`, a mismatch. Every emailed
   signed link is dead.
 
-`at: '*'` rather than a CIDR: nothing but Traefik can reach fpm, Traefik only answers
-Cloudflare (UFW + the DOCKER-USER ipset), and Docker's subnets move.
+Trusting all of Docker's private ranges is deliberate: Traefik's address moves with its
+network, and php-fpm has no network port anyone else could use (see Services).
 
 ## Services
 

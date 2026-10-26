@@ -188,7 +188,7 @@ the app image. It must report the forwarded client IP, `isSecure: true` and
 | Exit | Meaning |
 |---|---|
 | 0 | PASS — proxy headers trusted |
-| 1 | FAIL — the app is missing `trustProxies`, see `references/laravel.md` |
+| 1 | FAIL: the app's trusted proxies are missing or wrong (`'*'` included), see "Trusted proxies" in `references/laravel.md` |
 | 2 | **ABORT — the probe couldn't run.** Not a verdict about the app. Bad `APP_URL`, or the app wouldn't boot. Fix the invocation and re-run; don't "fix" the app. |
 
 `APP_URL` **must be https** — signed URLs are generated from it, so an http one makes the
