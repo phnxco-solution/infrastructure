@@ -36,8 +36,6 @@ Laravel's two returns clean while it ships.
 
 How a survivor fails is not consistent, so don't rely on noticing it:
 
-- `{{APP_NAME}}` in `nginx.conf` is unquoted (`set $fpm_upstream {{APP_NAME}}-fpm:9000;`)
-  → nginx won't parse its config, the container won't start. Loud.
 - `{{APP_NAME}}` in `deploy.yml` → pushes to a nonsense image name.
 - `{{BACKEND_HOST}}` in the SPA's `nginx.conf` is **quoted** → parses fine, container
   starts, site serves, and every `/api` and `/storage` request fails at runtime on a DNS
@@ -179,8 +177,14 @@ Include only what Phase 0 proved:
 | `scheduler` | `Schedule::` found | 128M |
 | `ssr` | Inertia SSR chosen | 192M (measures ~83M) |
 
-`app` needs `default` (with a `<app>-fpm` alias for nginx) **and** `backend`. `worker`
-needs `backend`. `nginx` needs `default` + `traefik-public`. `ssr` needs only `default`.
+php-fpm listens on `/run/php/php-fpm.sock`, never on a port: every app on the VPS shares
+`backend`, and FastCGI on port 9000 would let any of their containers set `PHP_VALUE` and run
+code with this app's `APP_KEY` and database credentials. The socket lives in the `fpm-socket`
+volume (tmpfs, which the backup preflight accepts as holding nothing) that only `app` and
+`nginx` mount. So `app` needs `backend` and `worker` needs `backend`; `nginx` needs only
+`traefik-public`. With SSR, `app` and `ssr` also share `default`, where the app calls the
+ssr service over HTTP. A one-off `docker compose run` of `app` carries the FPM health check
+without php-fpm, so run it with `--label autoheal=False`.
 
 **`ssr` gets no `env_file`** — it renders from the request payload and has no business
 holding DB/Redis credentials.

@@ -9,6 +9,7 @@ services:
       CONTAINER_ROLE: app
     volumes:
       - .:/var/www/html
+      - fpm-socket:/run/php
     networks:
       - backend
     depends_on:
@@ -36,6 +37,7 @@ services:
     volumes:
       - .:/var/www/html:ro
       - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - fpm-socket:/run/php
     networks:
       - backend
     depends_on:
@@ -107,6 +109,11 @@ services:
 volumes:
   mysql-data:
   vite-node-modules:
+  fpm-socket:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: uid=82,gid=82,mode=0755
 
 networks:
   backend:

@@ -9,7 +9,7 @@ Production-ready Docker setup for Laravel + Vue apps on the shared infrastructur
 | `docker/Dockerfile` | Multi-target PHP image (dev + production), OPcache with JIT, Redis, GD |
 | `docker/Dockerfile.nginx` | Nginx image with baked-in frontend assets (no shared volumes) |
 | `docker/entrypoint.sh` | CONTAINER_ROLE-based startup: migrations, storage link, optimize |
-| `docker/nginx.conf` | Gzip, fastcgi buffering, static asset caching, health endpoint (uses `{{APP_NAME}}` for the fpm upstream) |
+| `docker/nginx.conf` | Gzip, fastcgi buffering, static asset caching, health endpoint; reaches php-fpm through the shared socket |
 | `docker/docker-compose.prod.yml` | Production template: app, nginx, worker, scheduler (uses `{{APP_NAME}}`, `{{APP_DOMAIN}}`). **Goes to `apps/<name>/docker-compose.yml` in the infra repo**, not into the app repo. |
 | `docker-compose.yml` | Local dev: app, vite, nginx, worker, scheduler, mysql, redis |
 | `.dockerignore` | Excludes node_modules, vendor, tests, etc. from Docker context |
@@ -27,17 +27,14 @@ Laravel apps can't be built that way.
 
 ## Placeholders
 
-Three files contain placeholders:
+Two files contain placeholders:
 
 | Placeholder | Files | Example |
 |-------------|-------|---------|
-| `{{APP_NAME}}` | `docker/docker-compose.prod.yml`, `.github/workflows/deploy.yml`, `docker/nginx.conf` | `mega-catering` |
+| `{{APP_NAME}}` | `docker/docker-compose.prod.yml`, `.github/workflows/deploy.yml` | `mega-catering` |
 | `{{APP_DOMAIN}}` | `docker/docker-compose.prod.yml` | `mega-catering.phnx-solution.com` |
 
-`docker/nginx.conf` is the one that gets missed — `{{APP_NAME}}` there is the fpm
-upstream (`{{APP_NAME}}-fpm:9000`) and must match the network alias in the production
-compose. Left unsubstituted, nginx fails to parse its config and the container won't
-start. After substituting, check nothing survived:
+After substituting, check nothing survived:
 
 ```bash
 grep -rn "{{APP_NAME}}\|{{APP_DOMAIN}}" docker/ .github/ /path/to/infrastructure/apps/<name>/
@@ -103,6 +100,16 @@ For a real production deploy, leave it commented or remove it and the
 - Runs `php artisan optimize` (caches config, routes, views)
 
 **No `docker compose run` needed during deploy** — the entrypoint handles migrations on container start.
+
+## php-fpm has no network port
+
+php-fpm listens on `/run/php/php-fpm.sock`, in the `fpm-socket` volume that only `app` and
+`nginx` mount (the local `docker-compose.yml` shares it the same way). So `app` joins only
+`backend`, `nginx` only `traefik-public`, and no service needs the project's default network.
+Every app on the VPS shares `backend`, and php-fpm on port 9000 would take FastCGI requests from
+any of their containers, which can set `PHP_VALUE` and run code with this app's `APP_KEY` and
+database credentials. The volume is tmpfs, which the backup preflight recognises as holding
+nothing to back up.
 
 ## Production Notes
 

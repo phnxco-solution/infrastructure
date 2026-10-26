@@ -87,8 +87,9 @@ docker run --rm "$V-production" sh -c '
 
 ## 3. Run the stack
 
-Write a throwaway compose in the scratchpad, with the same **network aliases as
-production** (`<app>-fpm`, `<app>-ssr`) — the aliases are part of what's being tested.
+Write a throwaway compose in the scratchpad, wired like production: the `fpm-socket` volume
+shared by `app` and `nginx`, and the `<app>-ssr` alias with SSR. The wiring is part of what's
+being tested.
 
 **Use MySQL, not sqlite**, even though sqlite would be one less container. Production is
 MySQL 8.4, and migrations are exactly where the two diverge: anything MySQL-specific
@@ -129,16 +130,15 @@ services:
       INERTIA_SSR_URL: http://<app>-ssr:13714
     depends_on:
       mysql: { condition: service_healthy }
-    networks:
-      default:
-        aliases: [<app>-fpm]
+    volumes: [fpm-socket:/run/php]
     healthcheck:
-      test: ["CMD-SHELL", "SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong"]
+      test: ["CMD-SHELL", "SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect /run/php/php-fpm.sock | grep -q pong"]
       interval: 5s
       start_period: 10s
   nginx:
     image: verify-<name>-nginx
     ports: ["8088:80"]           # if taken, pick another and say which — don't kill the holder
+    volumes: [fpm-socket:/run/php]
     depends_on: { app: { condition: service_healthy } }
   ssr:
     image: verify-<name>-ssr
@@ -146,6 +146,9 @@ services:
       default:
         aliases: [<app>-ssr]
 networks: { default: }
+volumes:
+  fpm-socket:
+    driver_opts: { type: tmpfs, device: tmpfs, o: "uid=82,gid=82,mode=0755" }
 ```
 
 ```bash

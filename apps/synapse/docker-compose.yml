@@ -9,17 +9,15 @@ services:
       CONTAINER_ROLE: app
     volumes:
       - /opt/volumes/apps/synapse/storage:/var/www/html/storage
+      - fpm-socket:/run/php
     networks:
-      default:
-        aliases:
-          - synapse-fpm
-      backend:
+      - backend
     deploy:
       resources:
         limits:
           memory: 256M
     healthcheck:
-      test: ["CMD-SHELL", "SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong"]
+      test: ["CMD-SHELL", "SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect /run/php/php-fpm.sock | grep -q pong"]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -30,8 +28,8 @@ services:
     restart: unless-stopped
     volumes:
       - /opt/volumes/apps/synapse/storage/app/public:/var/www/html/public/storage:ro
+      - fpm-socket:/run/php
     networks:
-      - default
       - traefik-public
     depends_on:
       app:
@@ -78,8 +76,15 @@ services:
         limits:
           memory: 192M
 
+# php-fpm's socket, shared only between app and nginx; on tmpfs, so it holds nothing to back up.
+volumes:
+  fpm-socket:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: uid=82,gid=82,mode=0755
+
 networks:
-  default:
   traefik-public:
     external: true
   backend:

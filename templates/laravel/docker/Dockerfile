@@ -39,9 +39,14 @@ RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
     && docker-php-ext-enable redis \
     && apk del .build-deps
 
-# PHP-FPM pool configuration
-RUN printf '%s\n' \
+# PHP-FPM pool configuration. php-fpm listens only on a socket that nginx alone mounts, never on
+# a network port: every app on the VPS shares the backend network, and FastCGI on a port would
+# let any of them run PHP here.
+RUN install -d -o www-data -g www-data /run/php \
+    && printf '%s\n' \
     '[www]' \
+    'listen = /run/php/php-fpm.sock' \
+    'listen.mode = 0666' \
     'pm = dynamic' \
     'pm.max_children = 5' \
     'pm.start_servers = 2' \

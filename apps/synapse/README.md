@@ -9,7 +9,7 @@ the release pipeline; this file covers the VPS side.
 | Service | Why it exists |
 |---|---|
 | app | php-fpm; the release also runs the migrations with its image |
-| nginx | Traefik-facing, static files baked in |
+| nginx | Traefik-facing, static files baked in; reaches php-fpm only through the `fpm-socket` volume |
 | worker | the password reset email is queued (`ResetPasswordNotification implements ShouldQueue`) |
 
 No scheduler: there is no `Schedule::` anywhere, and `routes/console.php` holds only `inspire`.
@@ -124,6 +124,10 @@ VPS registration, preflight and the first uploaded set are pending.
   sets: rate limits and audit IPs can then be spoofed. Synapse trusts Docker's private ranges, where
   Traefik connects from, and Cloudflare's ranges, which Traefik appends to `X-Forwarded-For`, and
   only `X-Forwarded-For` and `X-Forwarded-Proto`. Keep its list in step with `traefik/traefik.yml`.
+- **php-fpm has no network port.** It listens on `/run/php/php-fpm.sock` in the `fpm-socket`
+  volume, which only `app` and `nginx` mount. So `app` sits on `backend` alone and `nginx` on
+  `traefik-public` alone, and no other app's container can send FastCGI requests to it. The
+  volume is tmpfs, so the backup preflight knows it holds nothing to back up.
 - **The health check sends the Host header.** Traefik checks Laravel's `/up` with
   `healthcheck.hostname`, because trusted hosts answer a bare container address with a 400, and
   Traefik would then take the site down with a 503.
