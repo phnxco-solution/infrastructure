@@ -11,9 +11,10 @@ Copy into the **app repo**, then substitute:
 | `docker/Dockerfile` | `docker/Dockerfile` | — |
 | `docker/Dockerfile.nginx` | `docker/Dockerfile.nginx` | — |
 | `docker/entrypoint.sh` | `docker/entrypoint.sh` | — |
-| `docker/nginx.conf` | `docker/nginx.conf` | `{{APP_NAME}}` (the fpm upstream — easy to miss) |
+| `docker/nginx.conf` | `docker/nginx.conf` | none |
 | `.dockerignore` | `.dockerignore` | — |
 | `.github/workflows/deploy.yml` | `.github/workflows/deploy.yml` | `{{APP_NAME}}` |
+| `docker/deploy.sh` | `docker/deploy.sh` | `{{APP_NAME}}` (the images and the app directory) |
 | `docker/docker-compose.prod.yml` | **`<infra>/apps/<name>/docker-compose.yml`** | `{{APP_NAME}}`, `{{APP_DOMAIN}}` |
 
 The last row is the one to notice: the production compose is a template file that lands
@@ -36,7 +37,8 @@ Laravel's two returns clean while it ships.
 
 How a survivor fails is not consistent, so don't rely on noticing it:
 
-- `{{APP_NAME}}` in `deploy.yml` → pushes to a nonsense image name.
+- `{{APP_NAME}}` in `deploy.yml` → pushes to a nonsense image name; in `docker/deploy.sh` →
+  the deploy pulls a nonsense image or `cd`s into a directory that doesn't exist.
 - `{{BACKEND_HOST}}` in the SPA's `nginx.conf` is **quoted** → parses fine, container
   starts, site serves, and every `/api` and `/storage` request fails at runtime on a DNS
   lookup for a host called `{{BACKEND_HOST}}`. Silent.
@@ -215,9 +217,9 @@ holding DB/Redis credentials.
 The storage volume shadows the image's `storage/`, so it must exist and be seeded before
 first boot — see `references/handoff.md`. Keep it even with no uploads: logs live there.
 
-### The workflow is the other half of the service list
+### The deploy script is the other half of the service list
 
-`templates/laravel/.github/workflows/deploy.yml` hardcodes:
+`templates/laravel/docker/deploy.sh`, which the workflow runs on the VPS, hardcodes:
 
 ```
 docker compose up -d --no-deps worker scheduler
@@ -225,12 +227,12 @@ docker compose up -d --no-deps worker scheduler
 
 Drop the scheduler per Phase 0 and leave that line alone → `no such service: scheduler`,
 **exit 1 under `set -e`**, after app and nginx are already up. Working site, red deploy,
-and `docker image prune` never runs. The template workflow also never builds or starts
-`ssr`; with SSR on, add the `--target ssr` build/push step and put `ssr` in the up line
-(app → ssr → nginx → worker).
+and `docker image prune` never runs. The template also never builds or starts `ssr`; with
+SSR on, add the `--target ssr` build/push step to the workflow, add the ssr image to the
+script's `images` list and put `ssr` in the up line (app → ssr → nginx → worker).
 
 Every service added or dropped in `apps/<name>/docker-compose.yml` has a matching edit in
-`deploy.yml`. One decision, two files. The same trap exists on Nuxt: its workflow runs
+`docker/deploy.sh`. One decision, two files. The same trap exists on Nuxt: its script runs
 `drizzle-kit migrate` unconditionally, so a non-Drizzle app needs that step removed too.
 
 ## Queue settings that must agree

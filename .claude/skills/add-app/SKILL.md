@@ -60,7 +60,7 @@ painful to change later.
 ## Claim the name, and check it isn't already done
 
 Both checks are cheap, and skipping either can **remove a running production app**. Every
-`deploy.yml` here runs `docker compose up -d --remove-orphans`, and Compose scopes
+app's `docker/deploy.sh` runs `docker compose up -d --remove-orphans`, and Compose scopes
 orphans by the `name:` label, **not the directory** — so a second project sharing a name
 stops and removes the first one's containers, from a deploy that reports green.
 
@@ -68,7 +68,7 @@ stops and removes the first one's containers, from a deploy that reports green.
 
 ```bash
 ls apps/<name>/ 2>/dev/null
-ls <app-repo>/docker/ <app-repo>/.github/workflows/deploy.yml 2>/dev/null
+ls <app-repo>/docker/ <app-repo>/docker/deploy.sh <app-repo>/.github/workflows/deploy.yml 2>/dev/null
 ```
 
 Anything present → this is an **edit, not a scaffold**. Diff the live file against what

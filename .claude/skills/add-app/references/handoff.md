@@ -120,8 +120,8 @@ All five, on the app repo. Check first — they may already exist:
 gh secret list --repo <org>/<app>
 ```
 
-`VPS_HOST`, `VPS_USER`, `VPS_PORT` and `VPS_SSH_KEY` are **identical across every app
-here**, so take them from a repo that already deploys. Secrets can't be read back, so
+`VPS_HOST`, `VPS_USER`, `VPS_PORT`, `VPS_SSH_KEY` and `VPS_KNOWN_HOSTS` are **identical
+across every app here**, so take them from a repo that already deploys. Secrets can't be read back, so
 ask the user for the values or the key path once, then:
 
 ```bash
@@ -139,21 +139,23 @@ the newline without printing key material:
 [ -n "$(tail -c1 ~/.ssh/<key>)" ] && echo "MISSING trailing newline" || echo "newline ok"
 ```
 
-**`GHCR_PAT` is the user's to run interactively.** It reads stdin, and with no TTY the
-call stores an **empty secret and reports success** — the deploy then fails `unauthorized`
-and the decoder below sends you hunting a `read:packages` scope that was never the
-problem. Hand it over:
+`VPS_KNOWN_HOSTS` holds the VPS's SSH host keys, which the deploy pins. They're public, but
+scan them against the exact `VPS_HOST` value (a hostname and an IP don't match) and compare
+with a `known_hosts` entry the user already trusts:
 
+```bash
+ssh-keyscan -p 41922 <VPS_HOST> | gh secret set VPS_KNOWN_HOSTS --repo <org>/<app>
 ```
-! gh secret set GHCR_PAT --repo <org>/<app>
-```
+
+There is no registry secret: `docker/deploy.sh` pulls with the workflow's own `GITHUB_TOKEN`
+in a throwaway Docker config.
 
 **Never ask for a PAT or a private key in chat.** It stays in the transcript. Same reason
 not to `cat`, `echo` or hexdump a key "to check it".
 
 `VPS_USER` must be `deploy` (sshd has `AllowUsers deploy`). The key's public half must be
-in `/home/deploy/.ssh/authorized_keys`. A passphrase-protected key also needs a
-`passphrase:` input on the ssh-action, which the template doesn't pass.
+in `/home/deploy/.ssh/authorized_keys`. A passphrase-protected key can't work: the deploy runs
+`ssh` with `BatchMode`.
 
 ## 4. Push the app
 
@@ -199,9 +201,10 @@ pending commands, rather than treating a template entry as verified protection.
 
 | Symptom | Cause |
 |---|---|
-| `ssh: handshake failed ... [none publickey]` | Key or user. Handshake happening at all proves HOST and PORT are right — sshd answered and rejected the key. Usually the trailing newline. |
+| `Host key verification failed` | `VPS_KNOWN_HOSTS` is missing, was scanned against another `VPS_HOST` value, or the VPS was rebuilt. Rescan it. |
+| `Permission denied (publickey)` | Key or user. Getting that far proves HOST, PORT and the host key are right: sshd answered and rejected the key. |
 | `cd: /opt/infrastructure/apps/<name>: No such file` | Infra not pushed or not pulled. |
-| `unauthorized` on pull | GHCR login on the VPS, or a `GHCR_PAT` without `read:packages`. |
+| `unauthorized` or `denied` on pull | The repo's workflow can't read the package: add the repo under the package's "Manage Actions access" with read access. |
 | Site 404s through Traefik | Container not up, or DNS pointed before the app existed. |
 | `WARN The SQLite database ... does not exist` | `DB_CONNECTION` isn't `mysql`. See `references/env-contract.md`. |
 | Worker restart-looping | Cache driver hitting a DB that isn't there. Same cause. |

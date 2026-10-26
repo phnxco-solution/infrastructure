@@ -70,20 +70,21 @@ if [ "$NODE_ENV" != "production" ]; then
 
 The production compose sets `NODE_ENV: production`, so this never fires there. **That is
 correct, not a bug** — it mirrors Laravel's entrypoint exactly. Production migrations
-belong in the deploy workflow, which runs
+belong in the deploy, whose `docker/deploy.sh` runs
 
 ```
-docker compose run --rm -T web ./node_modules/.bin/drizzle-kit migrate
+docker compose run --rm -T --label autoheal=False web ./node_modules/.bin/drizzle-kit migrate
 ```
 
 *before* `compose up -d --wait`, so the new image migrates while the old container still
-serves traffic. Verified in the template workflow and in all three Drizzle apps.
+serves traffic. `autoheal=False` because the one-off container carries the web health check
+without a server. Verified in the template and in all three Drizzle apps.
 
 Two deviations that are deliberate, not drift:
 
 - `apps/endlessly` migrates service `app`, not `web` — its compose names the service
   `app` (the older sidecar shape above). Match the service name to the compose.
-- `blogmana` rewrote its entrypoint to migrate on **every** start, and keeps the workflow
+- `blogmana` rewrote its entrypoint to migrate on **every** start, and keeps the deploy
   step too. Idempotent — drizzle-kit tracks applied migrations in `__drizzle_migrations`.
   A defensible different choice.
 - `phnx-solution` has no migrate step at all, correctly: no database, no `backend`

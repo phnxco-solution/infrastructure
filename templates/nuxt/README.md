@@ -29,13 +29,14 @@ See `.claude/skills/add-app/references/nuxt.md`.
 | `docker/docker-compose.prod.yml` | Production compose with Traefik labels |
 | `docker-compose.yml` | Local development (app + MySQL) |
 | `.dockerignore` | Excludes node_modules, .output, .nuxt, etc. |
-| `.github/workflows/deploy.yml` | CI/CD: build image, deploy to VPS |
+| `.github/workflows/deploy.yml` | CI/CD: build image, run `docker/deploy.sh` on the VPS over SSH with the host key pinned |
+| `docker/deploy.sh` | The release on the VPS: pulls with the job's own token, migrates, recreates the container |
 
 ## Placeholders
 
 | Placeholder | Where | Example |
 |-------------|-------|---------|
-| `{{APP_NAME}}` | prod compose, deploy workflow | `endlessly` |
+| `{{APP_NAME}}` | prod compose, deploy workflow, `docker/deploy.sh` | `endlessly` |
 | `{{APP_DOMAIN}}` | prod compose | `endlessly.phnx-solution.com` |
 
 ## Local Development
@@ -125,7 +126,7 @@ Single container on both networks:
 Pushes to `main` trigger the GitHub Actions workflow:
 1. Builds production Docker image
 2. Pushes to GHCR
-3. SSHs to VPS, pulls image, recreates container from `/opt/infrastructure/apps/<name>/docker-compose.yml`
+3. Runs `docker/deploy.sh` on the VPS over SSH (host key pinned by `VPS_KNOWN_HOSTS`): it pulls the image with the job's own token and recreates the container from `/opt/infrastructure/apps/<name>/docker-compose.yml`
 
 ## Customization
 

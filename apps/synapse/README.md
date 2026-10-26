@@ -107,12 +107,11 @@ VPS registration, preflight and the first uploaded set are pending.
 
 ## Quirks
 
-- **The release differs from the Laravel template.** The checks gate it, the images are
-  smoke-tested against MySQL 8.4 before they are pushed, and the deploy script lives in the app
-  repo (`docker/deploy.sh`). It is piped over plain SSH with the host key pinned instead of
-  `appleboy/ssh-action`, and pulls with the workflow's `GITHUB_TOKEN` in a throwaway Docker
-  config, leaving the VPS's own GHCR login untouched. A failed release retags the previous images
-  as `latest` and brings them back up, and only a successful one moves `latest` in GHCR.
+- **The release goes further than the Laravel template.** Like the template, it runs
+  `docker/deploy.sh` over SSH with the host key pinned and pulls with the workflow's own token.
+  On top of that, the checks gate it, the images are smoke-tested against MySQL 8.4 before they
+  are pushed, a failed release retags the previous images as `latest` and brings them back up,
+  and only a successful one moves `latest` in GHCR.
 - **The one-off migrate container is labelled `autoheal=False`.** It inherits the app's FPM health
   check but never starts php-fpm, so it turns unhealthy and autoheal would kill a slow migration.
   It also runs without `--isolated`: a stale lock makes that exit 0 and skip the migrations, and

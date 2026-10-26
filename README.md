@@ -306,7 +306,7 @@ To do it by hand, read `.claude/skills/add-app/references/detect.md` first.
 
 ### 2. Set up GitHub Secrets
 
-Add these secrets to your GitHub repo (or at the org level to share across repos):
+Add these secrets to the app's GitHub repo:
 
 | Secret | Value |
 |--------|-------|
@@ -314,12 +314,13 @@ Add these secrets to your GitHub repo (or at the org level to share across repos
 | `VPS_USER` | `deploy` |
 | `VPS_SSH_KEY` | Contents of the deploy user's private SSH key |
 | `VPS_PORT` | `41922` |
-| `GHCR_PAT` | GitHub Personal Access Token with `read:packages` scope |
+| `VPS_KNOWN_HOSTS` | The VPS's SSH host keys: `ssh-keyscan -p 41922 <VPS_HOST>` |
 
-**Generate the GHCR PAT:**
-1. Go to **GitHub → Settings → Developer Settings → Personal Access Tokens → Tokens (classic)**
-2. Create a token with `read:packages` scope
-3. Add it as `GHCR_PAT` secret in your repo
+The deploy runs `docker/deploy.sh` over plain SSH with those host keys pinned, so the deploy
+key and the job's token can only ever reach this VPS. Scan against the exact `VPS_HOST` value
+(a hostname and an IP don't match), and compare the result with your own `~/.ssh/known_hosts`.
+The VPS pulls the app's images with the workflow's own short-lived `GITHUB_TOKEN`, so no
+registry token is stored in the repo.
 
 ### 3. Set up on the VPS
 
@@ -524,6 +525,7 @@ bash /opt/infrastructure/scripts/verify-migration.sh
    - `VPS_HOST` → new IP
    - `VPS_PORT` → `41922`
    - `VPS_SSH_KEY` → new deploy user's key
+   - `VPS_KNOWN_HOSTS` → the new VPS's host keys (`ssh-keyscan -p 41922 <new IP>`)
 3. Delete the tarball from both VPS instances (contains secrets)
 4. Monitor logs for 24 hours before decommissioning the old VPS
 

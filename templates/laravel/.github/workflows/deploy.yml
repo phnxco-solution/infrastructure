@@ -13,7 +13,6 @@ concurrency:
 env:
   IMAGE_NAME: ghcr.io/phnxco-solution/{{APP_NAME}}
   NGINX_IMAGE_NAME: ghcr.io/phnxco-solution/{{APP_NAME}}-nginx
-  APP_DIR: /opt/infrastructure/apps/{{APP_NAME}}
 
 jobs:
   build-and-push:
@@ -69,41 +68,42 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build-and-push
+    permissions:
+      contents: read
+      packages: read
 
     steps:
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1
+      - name: Checkout
+        uses: actions/checkout@v7
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          script: |
-            set -e
+          persist-credentials: false
 
-            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ${{ env.IMAGE_NAME }}:${{ github.sha }}
-            docker pull ${{ env.NGINX_IMAGE_NAME }}:${{ github.sha }}
-            docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.IMAGE_NAME }}:latest
-            docker tag ${{ env.NGINX_IMAGE_NAME }}:${{ github.sha }} ${{ env.NGINX_IMAGE_NAME }}:latest
+      # The host key is pinned, so the deploy key and registry token only ever reach our VPS.
+      - name: Prepare SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$KNOWN_HOSTS" ]; then
+            echo "::error::Set the VPS_KNOWN_HOSTS secret: ssh-keyscan -p 41922 <VPS_HOST>."
+            exit 1
+          fi
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
 
-            cd ${{ env.APP_DIR }}
-
-            # Run migrations using new image while old containers still serve traffic.
-            # -T disables TTY (required for non-interactive SSH). The one-off container has the
-            # app's health check but no php-fpm, so autoheal=False keeps autoheal from killing a
-            # slow migration. No --isolated: a stale lock makes it exit 0 and skip the migrations,
-            # and the concurrency group already keeps deploys apart.
-            docker compose run --rm -T --label autoheal=False app php artisan migrate --force
-
-            # Recreate app, wait for healthy (--wait blocks until healthcheck passes)
-            docker compose up -d --no-deps --wait --wait-timeout 60 app
-
-            # Recreate nginx (Traefik-facing service — get it up right after app)
-            docker compose up -d --no-deps --wait --wait-timeout 30 nginx --remove-orphans
-
-            # Recreate background services (no traffic impact)
-            docker compose up -d --no-deps worker scheduler
-
-            docker compose ps
-            docker image prune -af --filter "until=168h"
+      # Runs docker/deploy.sh on the VPS, pulling with this job's own token instead of a stored PAT.
+      - name: Deploy to VPS
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          { printf 'REGISTRY_USER=%q\nREGISTRY_TOKEN=%q\n' "$GITHUB_ACTOR" "$REGISTRY_TOKEN"; cat docker/deploy.sh; } \
+            | ssh -i ~/.ssh/deploy_key -p "$VPS_PORT" \
+                -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+                -o ConnectTimeout=20 -o ServerAliveInterval=15 \
+                "$VPS_USER@$VPS_HOST" bash -s -- "$GITHUB_SHA"

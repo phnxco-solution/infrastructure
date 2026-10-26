@@ -10,7 +10,8 @@ Docker template for static single-page apps built with Vite (Vue, React, Svelte,
 | `docker/nginx.conf` | SPA fallback, PWA-aware cache headers, optional backend proxy |
 | `docker/docker-compose.prod.yml` | Production compose with Traefik labels (uses `{{APP_NAME}}`, `{{APP_DOMAIN}}`) |
 | `.dockerignore` | Excludes node_modules, dist, etc. |
-| `.github/workflows/deploy.yml` | GHA: build single image, deploy via SSH (uses `{{APP_NAME}}`) |
+| `.github/workflows/deploy.yml` | GHA: build single image, then run `docker/deploy.sh` on the VPS over SSH with the host key pinned (uses `{{APP_NAME}}`) |
+| `docker/deploy.sh` | The release on the VPS: pulls with the job's own token, recreates the container (uses `{{APP_NAME}}`) |
 
 ## Quick Start
 
@@ -33,7 +34,7 @@ These are sources, not a finished setup. Everything an SPA reads from
 
 | Placeholder | Where | Example |
 |-------------|-------|---------|
-| `{{APP_NAME}}` | prod compose, deploy workflow | `unimaginable-app` |
+| `{{APP_NAME}}` | prod compose, deploy workflow, `docker/deploy.sh` | `unimaginable-app` |
 | `{{APP_DOMAIN}}` | prod compose | `unimaginable.phnx-solution.com` |
 | `{{BACKEND_HOST}}` | `docker/nginx.conf` | `unimaginable-nginx-1:80` |
 
@@ -101,7 +102,7 @@ Default 64M per container — pure nginx serving static files is cheap. Adjust i
 Pushes to `main` trigger the workflow:
 1. Builds the nginx image (Node build inside Docker)
 2. Pushes to GHCR
-3. SSHs to the VPS, pulls the image, recreates the container
+3. Runs `docker/deploy.sh` on the VPS over SSH (host key pinned by `VPS_KNOWN_HOSTS`): it pulls the image with the job's own token and recreates the container
 
 There is no migration step — the image is fully self-contained.
 

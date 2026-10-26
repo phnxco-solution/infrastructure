@@ -13,7 +13,8 @@ Production-ready Docker setup for Laravel + Vue apps on the shared infrastructur
 | `docker/docker-compose.prod.yml` | Production template: app, nginx, worker, scheduler (uses `{{APP_NAME}}`, `{{APP_DOMAIN}}`). **Goes to `apps/<name>/docker-compose.yml` in the infra repo**, not into the app repo. |
 | `docker-compose.yml` | Local dev: app, vite, nginx, worker, scheduler, mysql, redis |
 | `.dockerignore` | Excludes node_modules, vendor, tests, etc. from Docker context |
-| `.github/workflows/deploy.yml` | GHA: builds 2 images (app + nginx), deploys via SSH (uses `{{APP_NAME}}`) |
+| `.github/workflows/deploy.yml` | GHA: builds 2 images (app + nginx), then runs `docker/deploy.sh` on the VPS over SSH with the host key pinned (uses `{{APP_NAME}}`) |
+| `docker/deploy.sh` | The release on the VPS: pulls with the job's own token, migrates, recreates the services (uses `{{APP_NAME}}`) |
 
 ## Quick Start
 
@@ -27,11 +28,11 @@ Laravel apps can't be built that way.
 
 ## Placeholders
 
-Two files contain placeholders:
+Three files contain placeholders:
 
 | Placeholder | Files | Example |
 |-------------|-------|---------|
-| `{{APP_NAME}}` | `docker/docker-compose.prod.yml`, `.github/workflows/deploy.yml` | `mega-catering` |
+| `{{APP_NAME}}` | `docker/docker-compose.prod.yml`, `.github/workflows/deploy.yml`, `docker/deploy.sh` | `mega-catering` |
 | `{{APP_DOMAIN}}` | `docker/docker-compose.prod.yml` | `mega-catering.phnx-solution.com` |
 
 After substituting, check nothing survived:
