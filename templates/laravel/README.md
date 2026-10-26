@@ -110,7 +110,7 @@ For a real production deploy, leave it commented or remove it and the
 
 **Scheduler** uses `schedule:work` (foreground daemon, no cron needed). For tasks that must not run twice if you ever scale to multiple containers, add `->onOneServer()` in your schedule definitions — works out of the box with Redis as cache driver.
 
-**Both worker and scheduler** wait for the app container to be healthy before starting (`depends_on`), ensuring migrations have run. Both have healthchecks so Autoheal can restart stuck processes.
+**Both worker and scheduler** wait for the app container to be healthy before starting (`depends_on`), ensuring migrations have run. Both have healthchecks so Autoheal can restart stuck processes. The checks match `pgrep -f '[a]rtisan …'`: without the brackets pgrep finds the check's own shell and always passes.
 
 **Redis queue config** — set these in your app's `config/queue.php` Redis connection:
 - `retry_after: 120` — must be greater than the worker's `--timeout=90`, otherwise jobs can execute twice

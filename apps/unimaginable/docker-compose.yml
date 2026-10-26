@@ -130,7 +130,8 @@ services:
     stop_signal: SIGTERM
     stop_grace_period: 60s
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'artisan schedule:work' > /dev/null || exit 1"]
+      # [a] keeps pgrep from matching this check's own shell.
+      test: ["CMD-SHELL", "pgrep -f '[a]rtisan schedule:work' > /dev/null || exit 1"]
       interval: 60s
       timeout: 5s
       retries: 3
