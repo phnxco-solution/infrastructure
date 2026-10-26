@@ -35,7 +35,9 @@ app's services. Do not change retention, schedule, or restore behavior while onb
    even for a database-free app. Additional persistent paths, writable named volumes,
    external databases, and unsupported database engines require deliberate backup
    support before claiming that the app is covered. A `null` mapping does not turn an
-   unsupported database into backed-up data.
+   unsupported database into backed-up data. The one named volume preflight accepts is
+   one on tmpfs (`driver_opts: {type: tmpfs}`), such as a Laravel app's `fpm-socket`: it
+   holds nothing that outlives the container.
 
 3. On the VPS, merge the same app entry into
    `/etc/infrastructure-backup/config.json`, as root. Preserve the existing public age

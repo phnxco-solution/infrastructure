@@ -99,6 +99,20 @@ class AppSelectionTests(unittest.TestCase):
                 m.Manager(dict(self.config, apps=apps)).apps()
             command.assert_not_called()
 
+    def test_named_volume_on_tmpfs_needs_no_backup_support(self):
+        self.model["services"]["web"]["volumes"].append({"type": "volume", "source": "fpm-socket", "target": "/run/php"})
+        self.model["volumes"] = {"fpm-socket": {"name": "demo_fpm-socket",
+                                                "driver_opts": {"type": "tmpfs", "device": "tmpfs"}}}
+        with patch.object(m, "run", side_effect=self.compose_config):
+            self.assertEqual(set(m.Manager(self.config).apps()), {"demo"})
+
+    def test_persistent_named_volume_still_needs_backup_support(self):
+        self.model["services"]["web"]["volumes"].append({"type": "volume", "source": "uploads", "target": "/app/uploads"})
+        self.model["volumes"] = {"uploads": {"name": "demo_uploads"}}
+        with patch.object(m, "run", side_effect=self.compose_config), \
+                self.assertRaisesRegex(m.BackupError, "writable named volume that needs explicit backup support"):
+            m.Manager(self.config).apps()
+
     def test_omitted_app_database_still_fails_global_coverage(self):
         manager = m.Manager(self.config)
         with patch.object(m, "run", side_effect=self.compose_config), \

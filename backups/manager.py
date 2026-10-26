@@ -100,6 +100,14 @@ def run(argv, *, data=None, output=None, timeout=None):
     return result.stdout
 
 
+def in_memory(mount, volumes):
+    # A named volume on tmpfs, such as the php-fpm socket nginx shares, holds nothing to back up.
+    if mount.get("type") != "volume":
+        return False
+    volume = volumes.get(mount.get("source")) or {}
+    return volume.get("driver", "local") == "local" and (volume.get("driver_opts") or {}).get("type") == "tmpfs"
+
+
 def safe_root(path):
     p = Path(path).absolute()
     require(p != Path("/") and p == p.resolve(), f"Root must be an absolute, non-symlink directory: {p}")
@@ -239,12 +247,13 @@ class Manager:
             model = json.loads(run(self.compose(name, "config", "--format", "json")))
             services = model.get("services", {})
             require(services, f"No services in {name}")
+            volumes = model.get("volumes", {}) or {}
             dbs = set()
             laravel = False
             for service in services.values():
                 env = service.get("environment", {}) or {}
                 for mount in service.get("volumes", []):
-                    if mount.get("read_only") or mount.get("type") == "tmpfs":
+                    if mount.get("read_only") or mount.get("type") == "tmpfs" or in_memory(mount, volumes):
                         continue
                     require(mount.get("type") == "bind", f"{name} has a writable named volume that needs explicit backup support")
                     source = Path(mount["source"]).resolve()
