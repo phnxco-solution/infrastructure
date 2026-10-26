@@ -50,7 +50,7 @@ compose by hand and copy the closest existing app:
 | Shape | Model |
 |---|---|
 | Any containerised HTTP service | `apps/blogmana` — one service, labels, healthcheck |
-| Static files, no build step | plain `nginx:1.27-alpine` + a read-only volume (`/opt/volumes/apps/<name>/public:/usr/share/nginx/html:ro`). No image, no deploy workflow, no GHCR. |
+| Static files, no build step | plain `nginx:1.30-alpine` + a read-only volume (`/opt/volumes/apps/<name>/public:/usr/share/nginx/html:ro`). No image, no deploy workflow, no GHCR. |
 | Third-party image | `uptime-kuma` in the root `docker-compose.yml` |
 
 The invariants, whatever the stack: an image (GHCR for anything built here),

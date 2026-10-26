@@ -10,7 +10,7 @@ Source files: `templates/spa/`.
 One service, `web`: nginx serving `dist/`, built into the image.
 
 ```
-web  ->  nginx:1.27-alpine  ->  :80  ->  traefik-public
+web  ->  nginx:1.30-alpine  ->  :80  ->  traefik-public
 ```
 
 Named `web`, not `nginx`, so its alias on the shared `traefik-public` network doesn't
@@ -39,7 +39,7 @@ image builds from `docker/Dockerfile.nginx` alone. Two things to know first:
 | Variant | When | Shape |
 |---|---|---|
 | **Built image** | The SPA has a build step and its own repo | `templates/spa/` as-is; deploy workflow builds and pushes one image |
-| **Files in a volume** | A hand-maintained static site | No image, no build, no deploy workflow. `nginx:1.27-alpine` with `/opt/volumes/apps/<name>/public:/usr/share/nginx/html:ro`. |
+| **Files in a volume** | A hand-maintained static site | No image, no build, no deploy workflow. `nginx:1.30-alpine` with `/opt/volumes/apps/<name>/public:/usr/share/nginx/html:ro`. |
 
 Don't scaffold a build pipeline for a site that's three HTML files. Ask which it is if
 detection is ambiguous.

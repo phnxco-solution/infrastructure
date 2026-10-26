@@ -65,7 +65,7 @@ If a probe result looks too good, check that timestamp before believing it.
 
 **Nuxt** builds `--target production` from `docker/Dockerfile` — one image, and only ever
 one. Even the sidecar shape (`apps/endlessly`) builds no nginx image: it runs stock
-`nginx:1.27-alpine` with a config mounted from the infra repo.
+`nginx:1.30-alpine` with a config mounted from the infra repo.
 
 **SPA** builds `-f docker/Dockerfile.nginx` only — there is no `docker/Dockerfile`.
 
