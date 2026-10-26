@@ -67,8 +67,10 @@ jobs:
             # Ensure log directory exists with correct ownership
             mkdir -p /opt/volumes/apps/{{APP_NAME}}/logs
 
-            # Run migrations using new image while old container still serves traffic
-            docker compose run --rm -T web ./node_modules/.bin/drizzle-kit migrate
+            # Run migrations using new image while old container still serves traffic. The
+            # one-off container carries the web health check without a server, so
+            # autoheal=False keeps autoheal from killing a slow migration.
+            docker compose run --rm -T --label autoheal=False web ./node_modules/.bin/drizzle-kit migrate
 
             # Recreate app, wait for healthy
             docker compose up -d --wait --wait-timeout 60 --remove-orphans

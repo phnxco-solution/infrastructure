@@ -95,11 +95,14 @@ For a real production deploy, leave it commented or remove it and the
 - `ghcr.io/phnxco-solution/<app>-nginx:latest` — Nginx with baked-in static assets
 
 **Entrypoint handles startup tasks** (only for `CONTAINER_ROLE=app`):
-- Runs migrations (`--force --isolated` in production)
 - Creates storage symlink
-- Runs `php artisan optimize` (caches config, routes, views)
+- Runs `php artisan optimize` outside local (caches config, routes, views); locally it migrates instead
 
-**No `docker compose run` needed during deploy** — the entrypoint handles migrations on container start.
+**The deploy workflow runs the migrations**, in a one-off `docker compose run` of the new image
+while the old containers still serve. It is labelled `autoheal=False`, because it carries the
+app's FPM health check without running php-fpm, and runs without `--isolated`, which exits 0 and
+skips the migrations when a stale lock is left behind. The workflow's concurrency group keeps
+deploys apart instead.
 
 ## php-fpm has no network port
 

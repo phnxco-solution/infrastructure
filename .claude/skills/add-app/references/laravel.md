@@ -194,7 +194,7 @@ first boot — see `references/handoff.md`. Keep it even with no uploads: logs l
 
 ### The workflow is the other half of the service list
 
-`templates/laravel/.github/workflows/deploy.yml:98` hardcodes:
+`templates/laravel/.github/workflows/deploy.yml` hardcodes:
 
 ```
 docker compose up -d --no-deps worker scheduler

@@ -5,6 +5,11 @@ on:
     branches:
       - master
 
+# Deploys never overlap, so two migrations never race.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
 env:
   IMAGE_NAME: ghcr.io/phnxco-solution/{{APP_NAME}}
   NGINX_IMAGE_NAME: ghcr.io/phnxco-solution/{{APP_NAME}}-nginx
@@ -84,9 +89,12 @@ jobs:
 
             cd ${{ env.APP_DIR }}
 
-            # Run migrations using new image while old containers still serve traffic
-            # -T disables TTY (required for non-interactive SSH)
-            docker compose run --rm -T app php artisan migrate --force --isolated
+            # Run migrations using new image while old containers still serve traffic.
+            # -T disables TTY (required for non-interactive SSH). The one-off container has the
+            # app's health check but no php-fpm, so autoheal=False keeps autoheal from killing a
+            # slow migration. No --isolated: a stale lock makes it exit 0 and skip the migrations,
+            # and the concurrency group already keeps deploys apart.
+            docker compose run --rm -T --label autoheal=False app php artisan migrate --force
 
             # Recreate app, wait for healthy (--wait blocks until healthcheck passes)
             docker compose up -d --no-deps --wait --wait-timeout 60 app
