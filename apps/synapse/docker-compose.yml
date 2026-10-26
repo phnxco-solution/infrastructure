@@ -1,0 +1,86 @@
+name: synapse
+
+services:
+  app:
+    image: ghcr.io/phnxco-solution/synapse:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      CONTAINER_ROLE: app
+    volumes:
+      - /opt/volumes/apps/synapse/storage:/var/www/html/storage
+    networks:
+      default:
+        aliases:
+          - synapse-fpm
+      backend:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  nginx:
+    image: ghcr.io/phnxco-solution/synapse-nginx:latest
+    restart: unless-stopped
+    volumes:
+      - /opt/volumes/apps/synapse/storage/app/public:/var/www/html/public/storage:ro
+    networks:
+      - default
+      - traefik-public
+    depends_on:
+      app:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.synapse.rule=Host(`synapse.phnx-solution.com`)"
+      - "traefik.http.routers.synapse.entrypoints=websecure"
+      - "traefik.http.routers.synapse.tls=true"
+      - "traefik.http.services.synapse.loadbalancer.server.port=80"
+      # /up boots Laravel, which answers only for its own host (trusted hosts), so the check
+      # sends that Host header.
+      - "traefik.http.services.synapse.loadbalancer.healthcheck.path=/up"
+      - "traefik.http.services.synapse.loadbalancer.healthcheck.hostname=synapse.phnx-solution.com"
+      - "traefik.http.services.synapse.loadbalancer.healthcheck.interval=15s"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  worker:
+    image: ghcr.io/phnxco-solution/synapse:latest
+    restart: unless-stopped
+    env_file: .env
+    command: php artisan queue:work redis --max-jobs=1000 --max-time=3600 --tries=3 --backoff=15 --timeout=90 --memory=128
+    volumes:
+      - /opt/volumes/apps/synapse/storage:/var/www/html/storage
+    networks:
+      - backend
+    depends_on:
+      app:
+        condition: service_healthy
+    stop_signal: SIGTERM
+    stop_grace_period: 120s
+    healthcheck:
+      # [a] keeps pgrep from matching this check's own shell.
+      test: ["CMD-SHELL", "pgrep -f '[a]rtisan queue:work' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+
+networks:
+  default:
+  traefik-public:
+    external: true
+  backend:
+    external: true

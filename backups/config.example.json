@@ -18,6 +18,7 @@
     "blogmana": {"database": "auto", "owner": [1000, 1000]},
     "voucher-tracker": {"database": "auto", "owner": [1000, 1000]},
     "gift-site-landing": {"database": null, "owner": [1000, 1000]},
-    "endlessly-landing": {"database": null, "owner": [1000, 1000]}
+    "endlessly-landing": {"database": null, "owner": [1000, 1000]},
+    "synapse": {"database": "auto", "owner": [82, 82]}
   }
 }
