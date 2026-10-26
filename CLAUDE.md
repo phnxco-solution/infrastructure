@@ -80,12 +80,12 @@ Two Docker networks:
 
 | App | Domain | Type |
 |-----|--------|------|
-| mega-catering | app.megacatering.rs (separate CF zone) | Laravel 12 + Vue 3 |
+| mega-catering | app.megacatering.rs (separate CF zone) | Laravel 13 + Vue 3 |
 | phnx-solution | phnx-solution.com | Nuxt 4 SSR (coming-soon page) |
-| endlessly | dusanimarija.cloud (separate CF zone) | Nuxt 3 SSR |
+| endlessly | dusanimarija.cloud (separate CF zone) | Nuxt 4 SSR + MySQL (Drizzle) |
 | demo-endlessly | endlessly.phnx-solution.com | Nuxt 4 SSR + MySQL (Drizzle) — demo instance, same image as endlessly |
-| blogmana | mana.phnx-solution.com | Nuxt SSR |
-| unimaginable | unimaginable.rs + api.unimaginable.rs (separate CF zone) | Laravel 12 (API + landing) |
+| blogmana | mana.phnx-solution.com | Nuxt 4 SSR + MySQL (Drizzle) |
+| unimaginable | unimaginable.rs + api.unimaginable.rs (separate CF zone) | Laravel 13 (API + landing) |
 | voucher-tracker | voucher-tracker.phnx-solution.com | Nuxt 4 SSR + MySQL (Drizzle) |
 | gift-site-landing | pokloni-sajt.phnx-solution.com | Node 22 static site + Gmail inquiry form (no DB) |
 | endlessly-landing | sajt-za-dvoje.phnx-solution.com | Nuxt 4 prerendered landing + Gmail inquiry form (no DB) |
