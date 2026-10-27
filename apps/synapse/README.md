@@ -114,12 +114,19 @@ app's auth timebox, so sign-in timing never reveals whether an account exists.
 ## Test calls
 
 Until the panel buys and assigns numbers, staging takes test calls on the demo client: Ana answers
-in Serbian and Grace in English. Seed them (no accounts, and a second run changes nothing), then
-point a number the Twilio account owns at Synapse and pick the agent that answers it:
+in Serbian and Grace in English. Seed them (no accounts; running it again brings the agents up to
+date), then point a number the Twilio account owns at Synapse and pick the agent that answers it:
 
 ```bash
 docker compose exec -T app php artisan db:seed --class=DemoClientSeeder --force
 docker compose exec app php artisan numbers:connect +12025550123
+```
+
+After a call, see how it went: its path, how a failed SIP leg ended, every turn with its timing,
+and the debrief (pass a call's id for an older one):
+
+```bash
+docker compose exec -T app php artisan calls:inspect
 ```
 
 ## Backups
