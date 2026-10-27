@@ -76,6 +76,45 @@ services:
         limits:
           memory: 192M
 
+  # The voice service runs in two slots, so a release never cuts a live call: the release starts
+  # the new image in the idle slot and stops the other once the new one is healthy. Both slots form
+  # one Traefik service, which sends new calls only to a slot whose /up answers.
+  voice-blue: &voice
+    image: ghcr.io/phnxco-solution/synapse-voice:latest
+    restart: unless-stopped
+    init: true
+    environment:
+      # stop_grace_period below must stay above this plus 15 seconds.
+      VOICE_MAX_CALL_SECONDS: 600
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      # Only Twilio's media streams reach the voice service; the rest of the host goes to nginx.
+      - "traefik.http.routers.synapse-voice.rule=Host(`synapse.phnx-solution.com`) && Path(`/media-stream`)"
+      - "traefik.http.routers.synapse-voice.entrypoints=websecure"
+      - "traefik.http.routers.synapse-voice.tls=true"
+      - "traefik.http.services.synapse-voice.loadbalancer.server.port=8090"
+      # /up turns 503 while the service is stopping, so Traefik sends it no new call.
+      - "traefik.http.services.synapse-voice.loadbalancer.healthcheck.path=/up"
+      - "traefik.http.services.synapse-voice.loadbalancer.healthcheck.interval=5s"
+    # Stopping, it waits for live calls to end, at most VOICE_MAX_CALL_SECONDS plus 15 seconds.
+    stop_grace_period: 11m
+    # Unhealthy, and so restarted by autoheal, only after a minute without an answer from /live:
+    # a process that can't answer that long isn't carrying a call either.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8090/live > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+
+  voice-green: *voice
+
 # php-fpm's socket, shared only between app and nginx; on tmpfs, so it holds nothing to back up.
 volumes:
   fpm-socket:

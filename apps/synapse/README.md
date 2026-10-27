@@ -11,6 +11,7 @@ the release pipeline; this file covers the VPS side.
 | app | php-fpm; the release also runs the migrations with its image |
 | nginx | Traefik-facing, static files baked in; reaches php-fpm only through the `fpm-socket` volume |
 | worker | the password reset email is queued (`ResetPasswordNotification implements ShouldQueue`) |
+| voice-blue, voice-green | the voice service (`services/voice`, Node) in two slots, of which one takes the calls; Traefik sends it only `/media-stream` |
 
 No scheduler: there is no `Schedule::` anywhere, and `routes/console.php` holds only `inspire`.
 Add one with the first scheduled task.
@@ -116,6 +117,14 @@ VPS registration, preflight and the first uploaded set are pending.
   check but never starts php-fpm, so it turns unhealthy and autoheal would kill a slow migration.
   It also runs without `--isolated`: a stale lock makes that exit 0 and skip the migrations, and
   the workflow already keeps releases from overlapping.
+- **The voice service runs in two slots, so a release never cuts a call.** `voice-blue` and
+  `voice-green` share one Traefik service. The release starts the new image in the idle slot and,
+  once it is healthy, stops the other in the background. Stopping, a slot answers 503 on `/up`, so
+  Traefik sends new calls elsewhere, and gives its live calls up to `stop_grace_period` (11 minutes)
+  to end; `VOICE_MAX_CALL_SECONDS` in the compose file must stay 15 seconds or more below it.
+  Docker watches `/live`, which answers while the process runs, and turns a slot unhealthy, so
+  autoheal restarts it, only after a minute without an answer. A plain `docker compose up -d`
+  is safe too: it starts the idle slot while the other finishes its calls before it restarts.
 - **The worker health check is `pgrep -f '[a]rtisan queue:work'`.** Without the brackets pgrep
   matches its own `sh -c` and the check always passes.
 - **Trusted proxies are listed, not `'*'`.** In Laravel 13, `trustProxies(at: '*')` trusts every
