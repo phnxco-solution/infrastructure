@@ -49,6 +49,7 @@ MAIL_MAILER=log                # until the transactional email account exists
 MAIL_FROM_ADDRESS=
 MAIL_FROM_NAME=Synapse
 
+TWILIO_ACCOUNT_SID=            # AC..., for Twilio's API
 TWILIO_AUTH_TOKEN=             # signs Twilio's webhooks
 OPENAI_API_KEY=
 OPENAI_PROJECT_ID=             # proj_..., the user part of the SIP address
@@ -107,6 +108,17 @@ docker compose exec -T app php artisan tinker --execute '$t = microtime(true); H
 
 `about` must show staging, mysql and redis. One password hash must take well under 600 ms, the
 app's auth timebox, so sign-in timing never reveals whether an account exists.
+
+## Test calls
+
+Until the panel buys and assigns numbers, staging takes test calls on the demo client: Ana answers
+in Serbian and Grace in English. Seed them (no accounts, and a second run changes nothing), then
+point a number the Twilio account owns at Synapse and pick the agent that answers it:
+
+```bash
+docker compose exec -T app php artisan db:seed --class=DemoClientSeeder --force
+docker compose exec app php artisan numbers:connect +12025550123
+```
 
 ## Backups
 
