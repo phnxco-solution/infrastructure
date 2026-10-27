@@ -11,10 +11,12 @@ the release pipeline; this file covers the VPS side.
 | app | php-fpm; the release also runs the migrations with its image |
 | nginx | Traefik-facing, static files baked in; reaches php-fpm only through the `fpm-socket` volume |
 | worker | the password reset email is queued (`ResetPasswordNotification implements ShouldQueue`) |
+| scheduler | `schedule:work`; every minute it sweeps up calls nothing reported the end of |
 | voice-blue, voice-green | the voice service (`services/voice`, Node) in two slots, of which one takes the calls; Traefik sends it only `/media-stream` |
 
-No scheduler: there is no `Schedule::` anywhere, and `routes/console.php` holds only `inspire`.
-Add one with the first scheduled task.
+The app, nginx and the voice slots also share `internal`, a network of their own: the voice
+service reaches Laravel's internal API at `synapse-nginx:8080`, a port Traefik never routes to, and
+Laravel reaches the service at `synapse-voice:8090`.
 
 ## Required .env
 
@@ -46,6 +48,13 @@ LOG_CHANNEL=daily
 MAIL_MAILER=log                # until the transactional email account exists
 MAIL_FROM_ADDRESS=
 MAIL_FROM_NAME=Synapse
+
+TWILIO_AUTH_TOKEN=             # signs Twilio's webhooks
+OPENAI_API_KEY=
+OPENAI_PROJECT_ID=             # proj_..., the user part of the SIP address
+OPENAI_WEBHOOK_SECRET=         # whsec_..., from the project's webhook
+VOICE_SERVICE_SECRET=          # openssl rand -hex 32; the voice slots get it too
+VOICE_SERVICE_URL=http://synapse-voice:8090
 ```
 
 - `APP_ENV` must never be `local`: there, `000000` passes two-factor authentication, so the image

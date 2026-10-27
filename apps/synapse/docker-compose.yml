@@ -12,6 +12,7 @@ services:
       - fpm-socket:/run/php
     networks:
       - backend
+      - internal
     deploy:
       resources:
         limits:
@@ -30,7 +31,11 @@ services:
       - /opt/volumes/apps/synapse/storage/app/public:/var/www/html/public/storage:ro
       - fpm-socket:/run/php
     networks:
-      - traefik-public
+      traefik-public:
+      # The voice service reaches Laravel's internal API here, on port 8080.
+      internal:
+        aliases:
+          - synapse-nginx
     depends_on:
       app:
         condition: service_healthy
@@ -76,6 +81,32 @@ services:
         limits:
           memory: 192M
 
+  scheduler:
+    image: ghcr.io/phnxco-solution/synapse:latest
+    restart: unless-stopped
+    env_file: .env
+    command: php artisan schedule:work
+    volumes:
+      - /opt/volumes/apps/synapse/storage:/var/www/html/storage
+    networks:
+      - backend
+    depends_on:
+      app:
+        condition: service_healthy
+    stop_signal: SIGTERM
+    stop_grace_period: 60s
+    healthcheck:
+      # [a] keeps pgrep from matching this check's own shell.
+      test: ["CMD-SHELL", "pgrep -f '[a]rtisan schedule:work' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
   # The voice service runs in two slots, so a release never cuts a live call: the release starts
   # the new image in the idle slot and stops the other once the new one is healthy. Both slots form
   # one Traefik service, which sends new calls only to a slot whose /up answers.
@@ -84,10 +115,18 @@ services:
     restart: unless-stopped
     init: true
     environment:
-      # stop_grace_period below must stay above this plus 15 seconds.
-      VOICE_MAX_CALL_SECONDS: 600
+      # Laravel reads the same value from .env; stop_grace_period below must stay above it plus 15
+      # seconds.
+      VOICE_MAX_CALL_SECONDS: ${VOICE_MAX_CALL_SECONDS:-600}
+      VOICE_SERVICE_SECRET: ${VOICE_SERVICE_SECRET:?Set VOICE_SERVICE_SECRET in .env}
+      VOICE_LARAVEL_URL: http://synapse-nginx:8080
+      VOICE_LARAVEL_HOST: synapse.phnx-solution.com
     networks:
-      - traefik-public
+      traefik-public:
+      # Laravel reaches the service here, and the service reaches Laravel at synapse-nginx.
+      internal:
+        aliases:
+          - synapse-voice
     labels:
       - "traefik.enable=true"
       # Only Twilio's media streams reach the voice service; the rest of the host goes to nginx.
@@ -128,3 +167,5 @@ networks:
     external: true
   backend:
     external: true
+  # Only Synapse's own containers: the app, nginx and the voice service talk to each other here.
+  internal: {}
