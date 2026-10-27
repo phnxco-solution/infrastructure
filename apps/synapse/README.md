@@ -52,6 +52,7 @@ MAIL_FROM_NAME=Synapse
 TWILIO_ACCOUNT_SID=            # AC..., for Twilio's API
 TWILIO_AUTH_TOKEN=             # signs Twilio's webhooks
 OPENAI_API_KEY=
+OPENAI_URL=https://eu.api.openai.com/v1   # for a project with European data residency
 OPENAI_PROJECT_ID=             # proj_..., the user part of the SIP address
 OPENAI_WEBHOOK_SECRET=         # whsec_..., from the project's webhook
 VOICE_SERVICE_SECRET=          # openssl rand -hex 32; the voice slots get it too

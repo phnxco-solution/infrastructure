@@ -121,6 +121,9 @@ services:
       VOICE_SERVICE_SECRET: ${VOICE_SERVICE_SECRET:?Set VOICE_SERVICE_SECRET in .env}
       VOICE_LARAVEL_URL: http://synapse-nginx:8080
       VOICE_LARAVEL_HOST: synapse.phnx-solution.com
+      # OpenAI where Laravel reaches it: eu.api.openai.com for a project with European data
+      # residency, whose calls only that host knows.
+      VOICE_OPENAI_URL: ${OPENAI_URL:-https://api.openai.com/v1}
     networks:
       traefik-public:
       # Laravel reaches the service here, and the service reaches Laravel at synapse-nginx.
