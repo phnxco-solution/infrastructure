@@ -11,7 +11,7 @@ the release pipeline; this file covers the VPS side.
 | app | php-fpm; the release also runs the migrations with its image |
 | nginx | Traefik-facing, static files baked in; reaches php-fpm only through the `fpm-socket` volume |
 | worker | the password reset email is queued (`ResetPasswordNotification implements ShouldQueue`) |
-| scheduler | `schedule:work`; every minute it sweeps up calls nothing reported the end of |
+| scheduler | `schedule:work`; every minute it sweeps up calls nothing reported the end of, and every five minutes it imports the calls Twilio took while Synapse didn't answer |
 | voice-blue, voice-green | the voice service (`services/voice`, Node) in two slots, of which one takes the calls; Traefik sends it only `/media-stream` |
 
 The app, nginx and the voice slots also share `internal`, a network of their own: the voice
@@ -116,7 +116,9 @@ app's auth timebox, so sign-in timing never reveals whether an account exists.
 
 Until the panel buys and assigns numbers, staging takes test calls on the demo client: Ana answers
 in Serbian and Grace in English. Seed them (no accounts; running it again brings the agents up to
-date), then point a number the Twilio account owns at Synapse and pick the agent that answers it:
+date), then point a number the Twilio account owns at Synapse and pick the agent that answers it.
+Connecting also deploys the voicemail Twilio plays when Synapse doesn't answer, and sets it as the
+number's fallback; connect a number again to bring its fallback up to date:
 
 ```bash
 docker compose exec -T app php artisan db:seed --class=DemoClientSeeder --force
