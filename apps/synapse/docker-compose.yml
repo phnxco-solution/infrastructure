@@ -124,6 +124,9 @@ services:
       # OpenAI where Laravel reaches it: eu.api.openai.com for a project with European data
       # residency, whose calls only that host knows.
       VOICE_OPENAI_URL: ${OPENAI_URL:-https://api.openai.com/v1}
+      # How long the hangup of a SIP call waits after OpenAI reports the goodbye played, the time
+      # its end takes to reach the caller.
+      VOICE_SIP_PLAYOUT_MS: ${VOICE_SIP_PLAYOUT_MS:-1500}
     networks:
       traefik-public:
       # Laravel reaches the service here, and the service reaches Laravel at synapse-nginx.

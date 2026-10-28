@@ -59,6 +59,7 @@ OPENAI_WEBHOOK_SECRET=         # whsec_..., from the project's webhook
 VOICE_SERVICE_SECRET=          # openssl rand -hex 32; the voice slots get it too
 VOICE_SERVICE_URL=http://synapse-voice:8090
 VOICE_DEBRIEF_FALLBACK_PROVIDER= # optional, such as anthropic with ANTHROPIC_API_KEY set
+VOICE_SIP_PLAYOUT_MS=          # optional: how long a hangup waits after the goodbye (1500 ms)
 ```
 
 - `APP_ENV` must never be `local`: there, `000000` passes two-factor authentication, so the image
