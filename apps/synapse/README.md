@@ -118,11 +118,12 @@ Until the panel buys and assigns numbers, staging takes test calls on the demo c
 in Serbian and Grace in English. Seed them (no accounts; running it again brings the agents up to
 date), then point a number the Twilio account owns at Synapse and pick the agent that answers it.
 Connecting also deploys the voicemail Twilio plays when Synapse doesn't answer, and sets it as the
-number's fallback; connect a number again to bring its fallback up to date:
+number's fallback; connect a number again to bring its fallback up to date. Without `-T` it asks
+which agent answers; with `-T`, name it with `--agent`:
 
 ```bash
 docker compose exec -T app php artisan db:seed --class=DemoClientSeeder --force
-docker compose exec app php artisan numbers:connect +12025550123
+docker compose exec -T app php artisan numbers:connect +12025550123 --agent=Ana
 ```
 
 After a call, see how it went: its path, how a failed SIP leg ended, every turn with its timing,
