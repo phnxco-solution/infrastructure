@@ -16,3 +16,6 @@ tls:
     # dusanimarija.cloud — separate Cloudflare zone (endlessly's primary domain)
     - certFile: /etc/traefik/certs/dusanimarija.pem
       keyFile: /etc/traefik/certs/dusanimarija-key.pem
+    # sajtzadvoje.rs: separate Cloudflare zone (endlessly-landing)
+    - certFile: /etc/traefik/certs/sajtzadvoje.pem
+      keyFile: /etc/traefik/certs/sajtzadvoje-key.pem

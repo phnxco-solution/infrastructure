@@ -18,9 +18,19 @@ services:
       - traefik-public
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.endlessly-landing.rule=Host(`sajt-za-dvoje.phnx-solution.com`)"
+      - "traefik.http.routers.endlessly-landing.rule=Host(`sajtzadvoje.rs`)"
       - "traefik.http.routers.endlessly-landing.entrypoints=websecure"
       - "traefik.http.routers.endlessly-landing.tls=true"
+      # www and the old phnx-solution.com subdomain 301 to the apex, path and query kept.
+      # $$ because compose expands $name in labels.
+      - "traefik.http.routers.endlessly-landing-redirect.rule=Host(`www.sajtzadvoje.rs`) || Host(`sajt-za-dvoje.phnx-solution.com`)"
+      - "traefik.http.routers.endlessly-landing-redirect.entrypoints=websecure"
+      - "traefik.http.routers.endlessly-landing-redirect.tls=true"
+      - "traefik.http.routers.endlessly-landing-redirect.service=endlessly-landing"
+      - "traefik.http.routers.endlessly-landing-redirect.middlewares=endlessly-landing-to-apex"
+      - "traefik.http.middlewares.endlessly-landing-to-apex.redirectregex.regex=^https?://[^/]+/(.*)"
+      - "traefik.http.middlewares.endlessly-landing-to-apex.redirectregex.replacement=https://sajtzadvoje.rs/$${1}"
+      - "traefik.http.middlewares.endlessly-landing-to-apex.redirectregex.permanent=true"
       - "traefik.http.services.endlessly-landing.loadbalancer.server.port=3000"
       - "traefik.http.services.endlessly-landing.loadbalancer.healthcheck.path=/"
       - "traefik.http.services.endlessly-landing.loadbalancer.healthcheck.interval=15s"

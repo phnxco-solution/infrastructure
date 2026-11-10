@@ -1,7 +1,8 @@
 # endlessly-landing
 
-sajt-za-dvoje.phnx-solution.com — Nuxt 4 landing page ("Sajt za dvoje") plus a Gmail
-inquiry form. Repo: `phnxco-solution/endlessly-landing` (local:
+sajtzadvoje.rs: Nuxt 4 landing page ("Sajt za dvoje") plus a Gmail inquiry form.
+`www.sajtzadvoje.rs` and the old `sajt-za-dvoje.phnx-solution.com` 301 to the apex
+with the path kept. Repo: `phnxco-solution/endlessly-landing` (local:
 `~/Projects/www/personal/endlessly-landing`, branch `master`).
 
 ## Services
@@ -10,8 +11,8 @@ inquiry form. Repo: `phnxco-solution/endlessly-landing` (local:
 |---|---|
 | web | `node .output/server/index.mjs` on :3000. Serves the prerendered `/` and handles `GET`/`POST /api/inquiry` |
 
-`/` is prerendered at build time (`nitro.prerender.routes: ['/']`), so Nitro serves it
-as a static file. Not an nginx-only site, because the form needs a server. The
+`/`, `/robots.txt` and `/sitemap.xml` are prerendered at build time
+(`nitro.prerender.routes`), so Nitro serves them as static files. Not an nginx-only site, because the form needs a server. The
 reCAPTCHA site key is fetched from `GET /api/inquiry` at runtime, so no value is baked
 into the image and the build takes no build args.
 
@@ -26,7 +27,7 @@ storage mount: nothing writes to disk. It needs **outbound SMTP to smtp.gmail.co
 GMAIL_USER=<gmail address that sends the letters>
 GMAIL_APP_PASSWORD=<16-char Google app password; spaces are stripped>
 INQUIRY_TO=<the single address that receives every letter>
-SITE_ORIGIN=https://sajt-za-dvoje.phnx-solution.com
+SITE_ORIGIN=https://sajtzadvoje.rs
 # Optional: reCAPTCHA v3. Leave both empty to run without it.
 RECAPTCHA_SITE_KEY=
 RECAPTCHA_SECRET_KEY=
@@ -57,9 +58,18 @@ mkdir -p /opt/volumes/apps/endlessly-landing/{storage,logs}
 sudo chown -R 1000:1000 /opt/volumes/apps/endlessly-landing
 ```
 
-DNS: proxied A record for `sajt-za-dvoje` in the `phnx-solution.com` zone, added after
-the container is up. A single label under the zone, so it rides the default origin
-cert.
+DNS and TLS:
+
+- `sajtzadvoje.rs` is its own Cloudflare zone: proxied A records for `@` and `www` to the
+  VPS, SSL/TLS **Full (strict)**, and its own Origin Certificate covering
+  `sajtzadvoje.rs` and `*.sajtzadvoje.rs` at `traefik/certs/sajtzadvoje.pem` +
+  `sajtzadvoje-key.pem`, listed in `traefik/dynamic/tls.yml`. Put the cert files on the
+  VPS before Traefik loads that entry.
+- The zone lets every AI crawler in (bot policies on Allow, managed robots.txt off), so
+  `/robots.txt` comes from the app. The phnx-solution.com zone blocks AI training
+  crawlers, which is why the landing left that zone.
+- The proxied `sajt-za-dvoje` record in the `phnx-solution.com` zone stays, so the old
+  address keeps answering with the 301.
 
 ## Backups
 
