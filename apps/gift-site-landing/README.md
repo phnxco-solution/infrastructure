@@ -1,6 +1,8 @@
 # gift-site-landing
 
-pokloni-sajt.phnx-solution.com — Node 22 static landing page plus a Gmail inquiry form.
+poklonisajt.rs: Node 22 site (home page plus gift pages) with a Gmail inquiry form.
+`www.poklonisajt.rs` and the old `pokloni-sajt.phnx-solution.com` 301 to the apex with
+the path and query kept.
 Repo: `phnxco-solution/gift-site-landing`
 
 ## Services
@@ -9,7 +11,9 @@ Repo: `phnxco-solution/gift-site-landing`
 |---|---|
 | web | `node server/index.mjs` on :3000. Serves the prebuilt `dist/` and handles `POST /api/inquiry` |
 
-No framework, no bundler: `npm run build` copies `public/` to `dist/`. The only runtime
+No framework, no bundler: `npm run build` copies `public/` to `dist/` and renders every
+page once as a check. The server joins each page with its shared partials at startup, so
+a broken page fails the boot (and the healthcheck) instead of a visit. The only runtime
 dependency is nodemailer, installed from the vendored `vendor/nodemailer-10.0.10.tgz`.
 
 Not an nginx-only SPA, because the form needs a server. `traefik-public` only: the app
@@ -23,7 +27,7 @@ smtp.gmail.com:465**.
 GMAIL_USER=<gmail address that sends the inquiries>
 GMAIL_APP_PASSWORD=<16-char Google app password; spaces are stripped>
 INQUIRY_TO=<the single address that receives inquiries>
-SITE_ORIGIN=https://pokloni-sajt.phnx-solution.com
+SITE_ORIGIN=https://poklonisajt.rs
 ```
 
 `NODE_ENV`, `HOST` and `PORT` come from compose and override `.env`. Don't copy them
@@ -49,9 +53,17 @@ mkdir -p /opt/volumes/apps/gift-site-landing/storage
 chown -R 1000:1000 /opt/volumes/apps/gift-site-landing
 ```
 
-DNS: proxied A record for `pokloni-sajt` in the `phnx-solution.com` zone, added after
-the container is up. A single label under the zone, so it rides the default origin
-cert.
+DNS and TLS: `poklonisajt.rs` is its own Cloudflare zone, set up as in the root README
+("Adding a second domain"): proxied A records for `@` and `www`, SSL Full (strict), and
+an Origin Certificate for `poklonisajt.rs` and `*.poklonisajt.rs` saved as
+`traefik/certs/poklonisajt.pem` and `poklonisajt-key.pem` (listed in
+`traefik/dynamic/tls.yml`). The old `pokloni-sajt` A record in the `phnx-solution.com`
+zone stays, because Traefik answers it with the redirect.
+
+Zone settings the site relies on: AI Crawl Control allows every crawler and the managed
+robots.txt is off, so the app's own `robots.txt` is served as is. Cloudflare Web
+Analytics stays off: the app's CSP blocks its beacon and the privacy text promises no
+analytics. The reCAPTCHA v3 key must list `poklonisajt.rs` among its domains.
 
 ## Backups
 

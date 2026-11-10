@@ -87,7 +87,7 @@ Two Docker networks:
 | blogmana | mana.phnx-solution.com | Nuxt 4 SSR + MySQL (Drizzle) |
 | unimaginable | unimaginable.rs + api.unimaginable.rs (separate CF zone) | Laravel 13 (API + landing) |
 | voucher-tracker | voucher-tracker.phnx-solution.com | Nuxt 4 SSR + MySQL (Drizzle) |
-| gift-site-landing | pokloni-sajt.phnx-solution.com | Node 22 static site + Gmail inquiry form (no DB) |
+| gift-site-landing | poklonisajt.rs (separate CF zone); www and pokloni-sajt.phnx-solution.com redirect to it | Node 22 static site + Gmail inquiry form (no DB) |
 | endlessly-landing | sajtzadvoje.rs (separate CF zone); www and sajt-za-dvoje.phnx-solution.com redirect to it | Nuxt 4 prerendered landing + Gmail inquiry form (no DB) |
 | synapse | synapse.phnx-solution.com | Laravel 13 + Vue 3 SPA, staging |
 | uptime-kuma | status.phnx-solution.com | Uptime monitoring |

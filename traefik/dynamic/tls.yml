@@ -19,3 +19,6 @@ tls:
     # sajtzadvoje.rs: separate Cloudflare zone (endlessly-landing)
     - certFile: /etc/traefik/certs/sajtzadvoje.pem
       keyFile: /etc/traefik/certs/sajtzadvoje-key.pem
+    # poklonisajt.rs: separate Cloudflare zone (gift-site-landing)
+    - certFile: /etc/traefik/certs/poklonisajt.pem
+      keyFile: /etc/traefik/certs/poklonisajt-key.pem

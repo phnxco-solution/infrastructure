@@ -20,9 +20,19 @@ services:
       - traefik-public
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.gift-site-landing.rule=Host(`pokloni-sajt.phnx-solution.com`)"
+      - "traefik.http.routers.gift-site-landing.rule=Host(`poklonisajt.rs`)"
       - "traefik.http.routers.gift-site-landing.entrypoints=websecure"
       - "traefik.http.routers.gift-site-landing.tls=true"
+      # www and the old phnx-solution.com subdomain 301 to the apex, path and query kept.
+      # $$ because compose expands $name in labels.
+      - "traefik.http.routers.gift-site-landing-redirect.rule=Host(`www.poklonisajt.rs`) || Host(`pokloni-sajt.phnx-solution.com`)"
+      - "traefik.http.routers.gift-site-landing-redirect.entrypoints=websecure"
+      - "traefik.http.routers.gift-site-landing-redirect.tls=true"
+      - "traefik.http.routers.gift-site-landing-redirect.service=gift-site-landing"
+      - "traefik.http.routers.gift-site-landing-redirect.middlewares=gift-site-landing-to-apex"
+      - "traefik.http.middlewares.gift-site-landing-to-apex.redirectregex.regex=^https?://[^/]+/(.*)"
+      - "traefik.http.middlewares.gift-site-landing-to-apex.redirectregex.replacement=https://poklonisajt.rs/$${1}"
+      - "traefik.http.middlewares.gift-site-landing-to-apex.redirectregex.permanent=true"
       - "traefik.http.services.gift-site-landing.loadbalancer.server.port=3000"
       - "traefik.http.services.gift-site-landing.loadbalancer.healthcheck.path=/"
       - "traefik.http.services.gift-site-landing.loadbalancer.healthcheck.interval=15s"
